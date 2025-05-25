@@ -20,12 +20,13 @@ const nextConfig: NextConfig = {
     ],
   },
   webpack: (config, { isServer }) => {
-    // Fix for 'async_hooks' error when OpenTelemetry (used by Genkit)
-    // tries to resolve Node.js specific modules on the client.
+    // Fix for Node.js specific modules error when OpenTelemetry (used by Genkit)
+    // tries to resolve them on the client.
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         async_hooks: false,
+        fs: false, // Add this line
       };
     }
     return config;
