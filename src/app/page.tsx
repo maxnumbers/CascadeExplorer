@@ -68,41 +68,58 @@ export default function CascadeExplorerPage() {
     };
     nodes.push(coreNode);
     
-    const addNodeIfNotExists = (impact: Impact, order: 1 | 2 | 3) => {
-      if (!nodes.find(n => n.id === impact.id)) {
-        const impactNode: ImpactNode = {
-          ...impact,
-          order,
-          type: 'impact',
-        };
-        nodes.push(impactNode);
-      }
+    const addNodeAndLink = (impact: Impact, order: 1 | 2 | 3, parentId: string) => {
+        if (!nodes.find(n => n.id === impact.id)) {
+            const impactNode: ImpactNode = {
+                ...impact,
+                order,
+                type: 'impact',
+            };
+            nodes.push(impactNode);
+            links.push({ source: parentId, target: impact.id });
+        }
     };
     
     impactData.firstOrder.forEach(fo => {
-        addNodeIfNotExists(fo, 1);
-        links.push({ source: coreNode.id, target: fo.id });
+        addNodeAndLink(fo, 1, coreNode.id);
     });
 
-    if (impactData.firstOrder.length > 0) {
+    impactData.secondOrder.forEach(so => {
+        // Try to find a parent in firstOrder. This logic might need refinement if mapping isn't direct.
+        // For now, this assumes secondOrder impacts relate to firstOrder impacts primarily.
+        // A more robust solution would require the AI to specify parent IDs for second/third order impacts.
+        const potentialParentFoId = impactData.firstOrder.find(fo => so.id.startsWith(fo.id + "-"))?.id || coreNode.id; // Example heuristic
+        addNodeAndLink(so, 2, potentialParentFoId);
+    });
+
+    impactData.thirdOrder.forEach(to => {
+        const potentialParentSoId = impactData.secondOrder.find(so => to.id.startsWith(so.id + "-"))?.id || coreNode.id; // Example heuristic
+        addNodeAndLink(to, 3, potentialParentSoId);
+    });
+    
+    // A simple linking logic for now: connect based on array position if AI doesn't give parent info
+    // This needs to be improved if the AI output doesn't imply parentage
+    if (impactData.firstOrder.length > 0 && impactData.secondOrder.length > 0) {
         impactData.secondOrder.forEach((so, idx) => {
-            addNodeIfNotExists(so, 2);
-            // Ensure there's a parent FO to link to, otherwise link to core assertion as a fallback
-            const parentFo = impactData.firstOrder[idx % impactData.firstOrder.length] || coreNode;
-            links.push({ source: parentFo.id, target: so.id });
+            if (!links.find(l => l.target === so.id)) { // If not already linked by a more specific logic
+                 const parentFo = impactData.firstOrder[idx % impactData.firstOrder.length];
+                 if (parentFo && !links.find(l => l.source === parentFo.id && l.target === so.id)) {
+                    links.push({ source: parentFo.id, target: so.id });
+                 }
+            }
+        });
+    }
+    if (impactData.secondOrder.length > 0 && impactData.thirdOrder.length > 0) {
+         impactData.thirdOrder.forEach((to, idx) => {
+            if (!links.find(l => l.target === to.id)) {
+                const parentSo = impactData.secondOrder[idx % impactData.secondOrder.length];
+                if (parentSo && !links.find(l => l.source === parentSo.id && l.target === to.id)) {
+                    links.push({ source: parentSo.id, target: to.id });
+                }
+            }
         });
     }
 
-    if (impactData.secondOrder.length > 0) {
-        impactData.thirdOrder.forEach((to, idx) => {
-            addNodeIfNotExists(to, 3);
-            // Ensure there's a parent SO to link to, otherwise link to a FO or core assertion as fallback
-            const parentSo = impactData.secondOrder[idx % impactData.secondOrder.length] 
-                          || impactData.firstOrder[idx % (impactData.firstOrder.length || 1)] 
-                          || coreNode;
-            links.push({ source: parentSo.id, target: to.id });
-        });
-    }
 
     return { nodes, links };
   }, []);
@@ -138,7 +155,7 @@ export default function CascadeExplorerPage() {
       const result = await suggestImpactConsolidation(rawImpactMapData);
       setConsolidationSuggestions(result);
       if (result.consolidationSuggestions.length > 0) {
-        toast({ title: "Consolidation Suggestions Ready", description: `${result.consolidationSuggestions.length} potential consolidations found. Review them in the new section below.` });
+        toast({ title: "Consolidation Suggestions Ready", description: `The AI found ${result.consolidationSuggestions.length} potential consolidation(s). Review them below.` });
       } else {
         toast({ title: "No Consolidations Found", description: "The AI did not find any impacts to consolidate at this time." });
       }
@@ -162,7 +179,7 @@ export default function CascadeExplorerPage() {
     if (selectedNode && selectedNode.id === nodeId) {
       setSelectedNode(prev => prev ? {...prev, validity} : null);
     }
-    // Update rawImpactMapData as well
+    
     setRawImpactMapData(prevRawData => {
         if (!prevRawData) return null;
         const updateImpacts = (impacts: Impact[]) => impacts.map(i => i.id === nodeId ? { ...i, validity } : i);
@@ -172,16 +189,81 @@ export default function CascadeExplorerPage() {
             thirdOrder: updateImpacts(prevRawData.thirdOrder),
         };
     });
-    toast({ title: "Validity Updated", description: `Node "${selectedNode?.label || nodeId}" validity set to ${validity}.`});
+    toast({ title: "Validity Updated", description: `Node "${graphNodes.find(n => n.id === nodeId)?.label || nodeId}" validity set to ${validity}.`});
   };
   
-  const handleApplyConsolidation = (suggestion: ConsolidatedImpactSuggestion) => {
-    // Placeholder for full apply logic (modifying graph, rawImpactMapData, etc.)
-    // For now, just remove the applied suggestion from the list and toast
-    toast({ 
-      title: "Suggestion Marked for Apply (UI Placeholder)", 
-      description: `Consolidation for "${suggestion.consolidatedImpact.label}" will be applied in a future update. The suggestion has been removed from the current list.`
+ const handleApplyConsolidation = (suggestion: ConsolidatedImpactSuggestion) => {
+    const { originalImpactIds, consolidatedImpact: suggestedConsolidatedImpact } = suggestion;
+    const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 1 | 2 | 3;
+
+    // 1. Update rawImpactMapData
+    setRawImpactMapData(prevRawData => {
+      if (!prevRawData) return null;
+      const updatedData = JSON.parse(JSON.stringify(prevRawData)) as AIImpactMappingOutput;
+
+      originalImpactIds.forEach(idToRemove => {
+        updatedData.firstOrder = updatedData.firstOrder.filter(i => i.id !== idToRemove);
+        updatedData.secondOrder = updatedData.secondOrder.filter(i => i.id !== idToRemove);
+        updatedData.thirdOrder = updatedData.thirdOrder.filter(i => i.id !== idToRemove);
+      });
+      
+      // Create the impact object for rawData (without the AI's 'order' field)
+      const { order, ...impactForRawData } = suggestedConsolidatedImpact;
+
+      if (newConsolidatedImpactOrder === 1) updatedData.firstOrder.push(impactForRawData);
+      else if (newConsolidatedImpactOrder === 2) updatedData.secondOrder.push(impactForRawData);
+      else if (newConsolidatedImpactOrder === 3) updatedData.thirdOrder.push(impactForRawData);
+      
+      return updatedData;
     });
+
+    // 2. Update graphNodes
+    setGraphNodes(prevNodes => {
+      const filteredNodes = prevNodes.filter(n => !originalImpactIds.includes(n.id));
+      const newGraphNode: ImpactNode = {
+        id: suggestedConsolidatedImpact.id,
+        label: suggestedConsolidatedImpact.label,
+        description: suggestedConsolidatedImpact.description,
+        validity: suggestedConsolidatedImpact.validity,
+        reasoning: suggestedConsolidatedImpact.reasoning,
+        order: newConsolidatedImpactOrder,
+        type: 'impact',
+      };
+      return [...filteredNodes, newGraphNode];
+    });
+
+    // 3. Update graphLinks
+    setGraphLinks(prevLinks => {
+      const newLinks: ImpactLink[] = [];
+      const consolidatedNodeId = suggestedConsolidatedImpact.id;
+
+      for (const link of prevLinks) {
+        const sourceIsOriginal = originalImpactIds.includes(link.source as string);
+        const targetIsOriginal = originalImpactIds.includes(link.target as string);
+
+        if (sourceIsOriginal && targetIsOriginal) {
+          // Link between two original nodes, gets removed
+          continue;
+        } else if (sourceIsOriginal) {
+          // Link from an original node to an external node
+          newLinks.push({ source: consolidatedNodeId, target: link.target });
+        } else if (targetIsOriginal) {
+          // Link from an external node to an original node
+          newLinks.push({ source: link.source, target: consolidatedNodeId });
+        } else {
+          // Link not involving original nodes
+          newLinks.push(link);
+        }
+      }
+      // Deduplicate links
+      const uniqueLinkStrings = new Set(newLinks.map(l => `${l.source}-${l.target}`));
+      return Array.from(uniqueLinkStrings).map(s => {
+        const [source, target] = s.split('-');
+        return { source, target };
+      });
+    });
+    
+    // 4. Update UI
     setConsolidationSuggestions(prev => {
       if (!prev) return null;
       return {
@@ -189,12 +271,17 @@ export default function CascadeExplorerPage() {
         consolidationSuggestions: prev.consolidationSuggestions.filter(s => s.consolidatedImpact.id !== suggestion.consolidatedImpact.id)
       };
     });
+
+    toast({ 
+      title: "Consolidation Applied", 
+      description: `Impacts consolidated into "${suggestion.consolidatedImpact.label}". Graph updated.`
+    });
   };
 
   const handleDismissConsolidation = (suggestionId: string) => {
      toast({ 
         title: "Suggestion Dismissed", 
-        description: `Suggestion with ID ${suggestionId} has been removed from the list.`
+        description: `Suggestion for consolidated impact ID ${suggestionId} has been removed from the list.`
     });
     setConsolidationSuggestions(prev => {
       if (!prev) return null;
@@ -258,12 +345,12 @@ export default function CascadeExplorerPage() {
           <div className="my-4 flex justify-center">
             <Button 
               onClick={handleSuggestConsolidations} 
-              disabled={isLoadingConsolidations || (consolidationSuggestions !== null && consolidationSuggestions.consolidationSuggestions.length > 0) }
+              disabled={isLoadingConsolidations || (consolidationSuggestions?.consolidationSuggestions?.length === 0 && consolidationSuggestions !== null)}
               variant="outline"
               className="bg-accent text-accent-foreground hover:bg-accent/90"
             >
               {isLoadingConsolidations ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lightbulb className="mr-2 h-4 w-4" />}
-              Suggest Consolidations
+              {consolidationSuggestions?.consolidationSuggestions?.length === 0 && consolidationSuggestions !== null ? "No More Suggestions" : "Suggest Consolidations"}
             </Button>
           </div>
         )}
@@ -310,4 +397,3 @@ export default function CascadeExplorerPage() {
     </div>
   );
 }
-

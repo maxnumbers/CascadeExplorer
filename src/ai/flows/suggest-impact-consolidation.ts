@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -18,12 +19,14 @@ export type SuggestImpactConsolidationInput = ImpactMappingOutputType;
 
 const ConsolidatedImpactSuggestionSchema = z.object({
   originalImpactIds: z.array(z.string()).describe("IDs of the impacts suggested for consolidation."),
-  consolidatedImpact: ImpactSchema.extend({ // Uses ImpactSchema imported from @/types/cascade
-    id: z.string().describe("A proposed unique ID for the new consolidated impact (e.g., consolidated-impact-1).")
+  consolidatedImpact: ImpactSchema.extend({ 
+    id: z.string().describe("A proposed unique ID for the new consolidated impact (e.g., consolidated-impact-1)."),
+    order: z.enum(['1', '2', '3']).describe("The hierarchical order (1st, 2nd, or 3rd) this consolidated impact best fits into, as a string '1', '2', or '3'.")
   }).describe("The suggested new consolidated impact, synthesizing the originals."),
   confidence: z.enum(['high', 'medium', 'low']).describe("Confidence in this consolidation suggestion (high, medium, low)."),
   reasoningForConsolidation: z.string().describe("Explanation why these impacts can be consolidated.")
 });
+export type ConsolidatedImpactSuggestion = z.infer<typeof ConsolidatedImpactSuggestionSchema>; // Exporting this type
 
 const SuggestImpactConsolidationOutputSchema = z.object({
   consolidationSuggestions: z.array(ConsolidatedImpactSuggestionSchema).describe("List of suggestions for consolidating impacts. Returns empty if no suitable consolidations are found.")
@@ -37,7 +40,7 @@ export async function suggestImpactConsolidation(input: SuggestImpactConsolidati
 
 const consolidationPrompt = ai.definePrompt({
   name: 'suggestImpactConsolidationPrompt',
-  input: {schema: SuggestImpactConsolidationInputSchema}, // Uses schema imported from @/types/cascade
+  input: {schema: SuggestImpactConsolidationInputSchema}, 
   output: {schema: SuggestImpactConsolidationOutputSchema},
   prompt: `You are an AI assistant skilled in identifying conceptual overlaps and redundancies in a structured list of impacts.
 Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion:
@@ -67,6 +70,7 @@ Your task is to:
         iii. \`description\`: A comprehensive description that synthesizes the original impacts' descriptions.
         iv. \`validity\`: An estimated validity ('high', 'medium', 'low') for the consolidated impact. This should be carefully considered based on the validities of the original impacts. For example, if consolidating a 'high' and 'low' validity impact, the result might be 'medium'.
         v. \`reasoning\`: A brief explanation for the consolidated impact's validity assessment (how the new validity was determined from originals).
+        vi. \`order\`: Determine the most appropriate hierarchical order ('1', '2', or '3') for this consolidated impact. This should be a string. Consider the orders of the original impacts and the nature of the consolidated idea. For example, if consolidating two 1st-order impacts, the result is likely '1'. If consolidating a 1st and 2nd, carefully consider if the consolidated idea is now a more direct (1st order) or still a downstream (2nd order) consequence.
     c. \`confidence\`: Your confidence ('high', 'medium', 'low') that this consolidation is appropriate and meaningful.
     d. \`reasoningForConsolidation\`: A brief explanation of why these specific impacts can be consolidated.
 3. If no such groups are found, return an empty list for \`consolidationSuggestions\`.
@@ -78,11 +82,10 @@ Focus on strong semantic similarity and avoid merging distinct consequences unle
 const suggestImpactConsolidationFlow = ai.defineFlow(
   {
     name: 'suggestImpactConsolidationFlow',
-    inputSchema: SuggestImpactConsolidationInputSchema, // Uses schema imported from @/types/cascade
+    inputSchema: SuggestImpactConsolidationInputSchema, 
     outputSchema: SuggestImpactConsolidationOutputSchema,
   },
   async (input) => {
-    // Ensure input has data, otherwise, AI might hallucinate.
     if (input.firstOrder.length === 0 && input.secondOrder.length === 0 && input.thirdOrder.length === 0) {
       return { consolidationSuggestions: [] };
     }
