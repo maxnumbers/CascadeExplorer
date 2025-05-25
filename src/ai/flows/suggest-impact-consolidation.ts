@@ -5,17 +5,18 @@
  * @fileOverview Suggests consolidation of similar or redundant impacts from an impact map.
  *
  * - suggestImpactConsolidation - A function that analyzes an impact map and suggests consolidations.
- * - SuggestImpactConsolidationInput - The input type (same as ImpactMappingOutput).
+ * - SuggestImpactConsolidationInput - The input type (expects all impacts grouped by order).
  * - SuggestImpactConsolidationOutput - The return type for consolidation suggestions.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 // Import schemas and types from the shared types file
-import { ImpactSchema, ImpactMappingOutputSchema as SuggestImpactConsolidationInputSchema } from '@/types/cascade';
-import type { ImpactMappingOutput as ImpactMappingOutputType } from '@/types/cascade';
+import { ImpactSchema, ImpactMappingInputForConsolidationSchema as SuggestImpactConsolidationInputSchema } from '@/types/cascade';
+import type { ImpactMappingInputForConsolidation as SuggestImpactConsolidationInputType } from '@/types/cascade';
 
-export type SuggestImpactConsolidationInput = ImpactMappingOutputType;
+
+export type SuggestImpactConsolidationInput = SuggestImpactConsolidationInputType;
 
 const ConsolidatedImpactSuggestionSchema = z.object({
   originalImpactIds: z.array(z.string()).describe("IDs of the impacts suggested for consolidation."),
@@ -26,7 +27,7 @@ const ConsolidatedImpactSuggestionSchema = z.object({
   confidence: z.enum(['high', 'medium', 'low']).describe("Confidence in this consolidation suggestion (high, medium, low)."),
   reasoningForConsolidation: z.string().describe("Explanation why these impacts can be consolidated.")
 });
-export type ConsolidatedImpactSuggestion = z.infer<typeof ConsolidatedImpactSuggestionSchema>; // Exporting this type
+export type ConsolidatedImpactSuggestion = z.infer<typeof ConsolidatedImpactSuggestionSchema>; 
 
 const SuggestImpactConsolidationOutputSchema = z.object({
   consolidationSuggestions: z.array(ConsolidatedImpactSuggestionSchema).describe("List of suggestions for consolidating impacts. Returns empty if no suitable consolidations are found.")
@@ -86,7 +87,10 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
     outputSchema: SuggestImpactConsolidationOutputSchema,
   },
   async (input) => {
-    if (input.firstOrder.length === 0 && input.secondOrder.length === 0 && input.thirdOrder.length === 0) {
+    if (!input.firstOrder && !input.secondOrder && !input.thirdOrder) {
+         return { consolidationSuggestions: [] };
+    }
+    if (input.firstOrder?.length === 0 && input.secondOrder?.length === 0 && input.thirdOrder?.length === 0) {
       return { consolidationSuggestions: [] };
     }
     const {output} = await consolidationPrompt(input);

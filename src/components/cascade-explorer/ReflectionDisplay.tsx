@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { AIReflectAssertionOutput } from '@/types/cascade';
@@ -9,9 +10,10 @@ interface ReflectionDisplayProps {
   reflection: AIReflectAssertionOutput;
   onConfirm: () => void;
   isLoadingConfirmation: boolean;
+  confirmButtonText?: string;
 }
 
-export function ReflectionDisplay({ reflection, onConfirm, isLoadingConfirmation }: ReflectionDisplayProps): JSX.Element {
+export function ReflectionDisplay({ reflection, onConfirm, isLoadingConfirmation, confirmButtonText = "Yes, this is correct. Generate Impact Map." }: ReflectionDisplayProps): JSX.Element {
   return (
     <Card className="mt-6 shadow-lg bg-card text-card-foreground">
       <CardHeader>
@@ -45,7 +47,7 @@ export function ReflectionDisplay({ reflection, onConfirm, isLoadingConfirmation
       <CardFooter>
         <Button onClick={onConfirm} disabled={isLoadingConfirmation} className="w-full sm:w-auto">
           {isLoadingConfirmation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-          Yes, this is correct. Generate Impact Map.
+          {confirmButtonText}
         </Button>
       </CardFooter>
     </Card>
