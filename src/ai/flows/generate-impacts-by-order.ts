@@ -32,17 +32,17 @@ export async function generateImpactsByOrder(input: GenerateImpactsByOrderInput)
 
 const prompt = ai.definePrompt({
   name: 'generateImpactsByOrderPrompt',
-  input: {schema: GenerateImpactsByOrderInputSchema},
+  input: {schema: GenerateImpactsByOrderInputSchema}, // Schema for documentation/validation, actual passed data can have more fields for template
   output: {schema: GenerateImpactsByOrderOutputSchema},
   prompt: `You are a Cascade Thinking System. Your goal is to identify cascading impacts.
 The overall assertion we are exploring is: "{{assertionText}}"
 
-{{#if (eq targetOrder "1")}}
+{{#if isTargetOrder1}}
 Based *only* on the assertion "{{assertionText}}", identify 3-5 distinct first-order impacts (immediate, direct effects).
 Do not generate second or third order impacts yet.
 {{/if}}
 
-{{#if (eq targetOrder "2")}}
+{{#if isTargetOrder2}}
 We have the following first-order impacts stemming from the assertion "{{assertionText}}":
 {{#each parentImpacts}}
 - Parent Impact (1st Order) ID {{id}}, Label: "{{label}}", Description: "{{description}}"
@@ -52,7 +52,7 @@ Ensure the second-order effects are logical consequences of their specific paren
 Do not generate third order impacts yet.
 {{/if}}
 
-{{#if (eq targetOrder "3")}}
+{{#if isTargetOrder3}}
 We have the following second-order impacts, which ultimately stem from the assertion "{{assertionText}}":
 {{#each parentImpacts}}
 - Parent Impact (2nd Order) ID {{id}}, Label: "{{label}}", Description: "{{description}}"
@@ -83,12 +83,26 @@ const generateImpactsByOrderFlow = ai.defineFlow(
   },
   async (input) => {
     if ((input.targetOrder === '2' || input.targetOrder === '3') && (!input.parentImpacts || input.parentImpacts.length === 0)) {
-      // If generating 2nd/3rd order but no parents provided, return empty or handle error.
-      // For now, let the prompt handle it, but this check is good.
-      // Consider throwing an error or returning empty if this is invalid.
-      // The prompt currently might not generate much if parentImpacts is empty.
+      // This condition is primarily handled on the client-side before calling the flow.
+      // However, if the flow is called directly, it's good to be aware.
+      // The prompt currently might not generate much if parentImpacts is empty for order 2/3.
+      // Consider returning an empty array or specific error if this is an invalid state for the AI.
+      // For now, let AI handle it, it should return an empty generatedImpacts or similar.
     }
-    const {output} = await prompt(input);
+
+    const isTargetOrder1 = input.targetOrder === '1';
+    const isTargetOrder2 = input.targetOrder === '2';
+    const isTargetOrder3 = input.targetOrder === '3';
+
+    const promptInput = {
+      ...input,
+      isTargetOrder1,
+      isTargetOrder2,
+      isTargetOrder3,
+    };
+
+    const {output} = await prompt(promptInput);
     return output!;
   }
 );
+
