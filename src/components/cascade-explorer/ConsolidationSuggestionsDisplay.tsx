@@ -2,6 +2,7 @@
 "use client";
 
 import type { SuggestImpactConsolidationOutput, ConsolidatedImpactSuggestion } from '@/ai/flows/suggest-impact-consolidation';
+import type { ImpactNode } from '@/types/cascade';
 import {
   Accordion,
   AccordionContent,
@@ -11,53 +12,57 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, XCircle, Merge } from 'lucide-react';
 
 interface ConsolidationSuggestionsDisplayProps {
   suggestions: SuggestImpactConsolidationOutput | null;
-  onApplyConsolidation: (suggestion: ConsolidatedImpactSuggestion) => void; // Placeholder for future
-  onDismissSuggestion: (suggestionId: string) => void; // Placeholder for future
+  graphNodes: ImpactNode[]; // To look up original node details
+  onApplyConsolidation: (suggestion: ConsolidatedImpactSuggestion) => void;
+  onDismissSuggestion: (suggestionId: string) => void;
 }
 
 export function ConsolidationSuggestionsDisplay({ 
   suggestions, 
+  graphNodes,
   onApplyConsolidation, 
   onDismissSuggestion 
 }: ConsolidationSuggestionsDisplayProps): JSX.Element | null {
   if (!suggestions || suggestions.consolidationSuggestions.length === 0) {
-    return null; // Or a message like "No consolidation suggestions at this time."
+    return null; 
   }
 
-  // Helper function to get a short label for the trigger, maybe from the first original impact
   const getTriggerLabel = (suggestion: ConsolidatedImpactSuggestion) => {
-    // This part needs access to the original nodes' labels.
-    // For now, let's use the proposed consolidated label as a placeholder,
-    // or list the IDs.
-    if (suggestion.consolidatedImpact.label) {
-      return `Suggestion: Consolidate to "${suggestion.consolidatedImpact.label}"`;
+    const originalLabels = suggestion.originalImpactIds.map(id => {
+      const node = graphNodes.find(n => n.id === id);
+      return node ? `"${node.label}"` : `ID: ${id}`;
+    }).slice(0, 2); // Show first two labels for brevity
+
+    let labelText = `Consolidate: ${originalLabels.join(' & ')}`;
+    if (suggestion.originalImpactIds.length > 2) {
+      labelText += ` & ${suggestion.originalImpactIds.length - 2} more`;
     }
-    return `Consolidate ${suggestion.originalImpactIds.length} impacts: ${suggestion.originalImpactIds.join(', ')}`;
+    labelText += ` -> "${suggestion.consolidatedImpact.label}"`;
+    return labelText;
   };
   
   const getConfidenceVariant = (confidence: 'high' | 'medium' | 'low'): "default" | "secondary" | "destructive" => {
     switch (confidence) {
-      case 'high': return 'default'; // Or a success-like variant if available
+      case 'high': return 'default'; 
       case 'medium': return 'secondary';
-      case 'low': return 'destructive'; // Or an outline/warning variant
+      case 'low': return 'destructive'; 
       default: return 'secondary';
     }
   };
-
 
   return (
     <Card className="mt-6 shadow-xl bg-card text-card-foreground">
       <CardHeader>
         <CardTitle className="text-xl text-primary flex items-center">
-          <AlertCircle className="w-6 h-6 mr-2 text-accent" />
+          <Merge className="w-6 h-6 mr-2 text-accent" />
           Impact Consolidation Suggestions
         </CardTitle>
-        <CardDescription>
-          The AI has identified potential overlaps or redundancies in the impact map. Review the suggestions below.
+        <CardDescription className="text-muted-foreground">
+          The AI has identified potential overlaps. Review the suggestions below to streamline your impact map.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -66,60 +71,72 @@ export function ConsolidationSuggestionsDisplay({
         ) : (
           <Accordion type="single" collapsible className="w-full">
             {suggestions.consolidationSuggestions.map((suggestion, index) => (
-              <AccordionItem value={`item-${index}`} key={suggestion.consolidatedImpact.id || `suggestion-${index}`}>
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex flex-col text-left">
-                     <span className="font-semibold">{getTriggerLabel(suggestion)}</span>
-                     <span className="text-xs text-muted-foreground">
-                        Original IDs: {suggestion.originalImpactIds.join(', ')}
+              <AccordionItem value={`item-${index}`} key={suggestion.consolidatedImpact.id || `suggestion-${index}`} className="border-border">
+                <AccordionTrigger className="hover:no-underline text-left">
+                  <div className="flex flex-col">
+                     <span className="font-semibold text-primary">{getTriggerLabel(suggestion)}</span>
+                     <span className="text-xs text-muted-foreground mt-1">
+                        Confidence: <Badge variant={getConfidenceVariant(suggestion.confidence)} className="ml-1">{suggestion.confidence}</Badge>
                      </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="space-y-4 p-4 bg-background/30 rounded-md">
+                <AccordionContent className="space-y-6 p-4 bg-background/30 rounded-md border border-border mt-1">
+                  
                   <div>
-                    <h4 className="font-semibold text-primary">Proposed Consolidated Impact:</h4>
-                    <p><strong className="text-sm">Label:</strong> {suggestion.consolidatedImpact.label}</p>
-                    <p><strong className="text-sm">Description:</strong> {suggestion.consolidatedImpact.description}</p>
-                    <p>
-                      <strong className="text-sm">Validity:</strong> {suggestion.consolidatedImpact.validity}
-                      <span className="text-xs text-muted-foreground_FIX_THIS_LATER_TODO"> (Reasoning: {suggestion.consolidatedImpact.reasoning})</span>
-                    </p>
+                    <h4 className="font-semibold text-accent mb-2">Original Impacts to Consolidate:</h4>
+                    <ul className="space-y-3">
+                      {suggestion.originalImpactIds.map(id => {
+                        const originalNode = graphNodes.find(n => n.id === id);
+                        return (
+                          <li key={id} className="p-3 border border-input rounded-md bg-card/50 shadow-sm">
+                            <p className="font-medium text-primary-foreground">Label: <span className="font-normal text-foreground">{originalNode?.label || id}</span></p>
+                            <p className="text-sm text-muted-foreground mt-1"><strong>Description:</strong> {originalNode?.description || 'N/A'}</p>
+                            <p className="text-sm mt-1"><strong>Current Validity:</strong> <Badge variant="outline" className="ml-1">{originalNode?.validity || 'N/A'}</Badge></p>
+                          </li>
+                        );
+                      })}
+                    </ul>
                   </div>
+                  
+                  <div className="border-t border-border my-4"></div>
+
                   <div>
-                    <h4 className="font-semibold text-primary">AI Analysis:</h4>
-                    <p><strong className="text-sm">Reasoning for Consolidation:</strong> {suggestion.reasoningForConsolidation}</p>
-                    <p className="flex items-center">
-                        <strong className="text-sm mr-2">Confidence:</strong> 
-                        <Badge variant={getConfidenceVariant(suggestion.confidence)}>{suggestion.confidence}</Badge>
-                    </p>
+                    <h4 className="font-semibold text-accent mb-2">Proposed Consolidated Impact:</h4>
+                    <div className="p-3 border border-input rounded-md bg-card/50 shadow-sm">
+                        <p><strong className="text-sm text-primary-foreground">New Label:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.label}</span></p>
+                        <p className="mt-1"><strong className="text-sm text-primary-foreground">New Description:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.description}</span></p>
+                        <p className="mt-1">
+                        <strong className="text-sm text-primary-foreground">Proposed Validity:</strong> <Badge variant={getConfidenceVariant(suggestion.consolidatedImpact.validity)} className="ml-1">{suggestion.consolidatedImpact.validity}</Badge>
+                        <span className="text-xs text-muted-foreground ml-2">(Reasoning: {suggestion.consolidatedImpact.reasoning})</span>
+                        </p>
+                    </div>
                   </div>
-                  <div className="flex gap-2 mt-4">
+
+                  <div className="border-t border-border my-4"></div>
+
+                  <div>
+                    <h4 className="font-semibold text-accent mb-1">AI's Rationale:</h4>
+                    <p className="text-sm text-muted-foreground"><strong className="text-primary-foreground">Reason for Consolidation:</strong> {suggestion.reasoningForConsolidation}</p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 mt-6">
                     <Button 
                       size="sm" 
-                      onClick={() => {
-                        console.log("Apply suggestion:", suggestion); // Placeholder
-                        onApplyConsolidation(suggestion);
-                        // toast({ title: "Suggestion Applied (Placeholder)", description: `Consolidated into ${suggestion.consolidatedImpact.label}`});
-                      }}
-                      disabled // Enable once functionality is built
-                      className="bg-primary/80 hover:bg-primary"
+                      onClick={() => onApplyConsolidation(suggestion)}
+                      className="bg-primary text-primary-foreground hover:bg-primary/90 flex-grow sm:flex-grow-0"
                     >
                       <CheckCircle2 className="mr-2 h-4 w-4" /> Apply Consolidation
                     </Button>
                     <Button 
                       size="sm" 
                       variant="outline"
-                      onClick={() => {
-                        console.log("Dismiss suggestion:", suggestion.consolidatedImpact.id); // Placeholder
-                        // onDismissSuggestion(suggestion.consolidatedImpact.id); 
-                        // toast({ title: "Suggestion Dismissed (Placeholder)"});
-                      }}
-                      disabled // Enable once functionality is built
+                      onClick={() => onDismissSuggestion(suggestion.consolidatedImpact.id)}
+                      className="flex-grow sm:flex-grow-0"
                     >
-                      Dismiss
+                      <XCircle className="mr-2 h-4 w-4" /> Dismiss
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground_FIX_THIS_LATER_TODO_SECONDARY italic mt-2">Note: Applying consolidations is not yet implemented in the UI.</p>
+                  <p className="text-xs text-muted-foreground italic mt-3">Note: "Apply Consolidation" currently removes this suggestion from the list. Full graph merging is a future enhancement.</p>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -128,7 +145,7 @@ export function ConsolidationSuggestionsDisplay({
       </CardContent>
       {suggestions.consolidationSuggestions.length > 0 && (
         <CardFooter>
-            <p className="text-xs text-muted-foreground">Review each suggestion. Applying consolidations will merge impacts in the graph (feature coming soon).</p>
+            <p className="text-xs text-muted-foreground">Review each suggestion carefully. Applying consolidations will eventually merge impacts in the graph.</p>
         </CardFooter>
       )}
     </Card>

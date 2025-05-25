@@ -138,7 +138,7 @@ export default function CascadeExplorerPage() {
       const result = await suggestImpactConsolidation(rawImpactMapData);
       setConsolidationSuggestions(result);
       if (result.consolidationSuggestions.length > 0) {
-        toast({ title: "Consolidation Suggestions Ready", description: `${result.consolidationSuggestions.length} potential consolidations found. Review them below.` });
+        toast({ title: "Consolidation Suggestions Ready", description: `${result.consolidationSuggestions.length} potential consolidations found. Review them in the new section below.` });
       } else {
         toast({ title: "No Consolidations Found", description: "The AI did not find any impacts to consolidate at this time." });
       }
@@ -174,17 +174,14 @@ export default function CascadeExplorerPage() {
     });
     toast({ title: "Validity Updated", description: `Node "${selectedNode?.label || nodeId}" validity set to ${validity}.`});
   };
-
-  // Placeholder functions for consolidation actions
+  
   const handleApplyConsolidation = (suggestion: ConsolidatedImpactSuggestion) => {
-    // This is where logic to merge nodes would go.
-    // It would involve:
-    // 1. Removing original nodes from graphNodes and rawImpactMapData.
-    // 2. Adding the new consolidated node to graphNodes and rawImpactMapData.
-    // 3. Re-calculating graphLinks.
-    // 4. Clearing or updating consolidationSuggestions.
-    toast({ title: "Apply (Not Implemented)", description: `Would apply consolidation for ${suggestion.consolidatedImpact.label}`});
-    // For now, let's just remove the applied suggestion from the list
+    // Placeholder for full apply logic (modifying graph, rawImpactMapData, etc.)
+    // For now, just remove the applied suggestion from the list and toast
+    toast({ 
+      title: "Suggestion Marked for Apply (UI Placeholder)", 
+      description: `Consolidation for "${suggestion.consolidatedImpact.label}" will be applied in a future update. The suggestion has been removed from the current list.`
+    });
     setConsolidationSuggestions(prev => {
       if (!prev) return null;
       return {
@@ -195,8 +192,10 @@ export default function CascadeExplorerPage() {
   };
 
   const handleDismissConsolidation = (suggestionId: string) => {
-     toast({ title: "Dismiss (Not Implemented)", description: `Would dismiss suggestion ${suggestionId}`});
-    // For now, let's just remove the dismissed suggestion from the list
+     toast({ 
+        title: "Suggestion Dismissed", 
+        description: `Suggestion with ID ${suggestionId} has been removed from the list.`
+    });
     setConsolidationSuggestions(prev => {
       if (!prev) return null;
       return {
@@ -279,8 +278,9 @@ export default function CascadeExplorerPage() {
         {consolidationSuggestions && consolidationSuggestions.consolidationSuggestions.length > 0 && !isLoadingConsolidations && (
           <ConsolidationSuggestionsDisplay 
             suggestions={consolidationSuggestions}
-            onApplyConsolidation={handleApplyConsolidation} // Placeholder
-            onDismissSuggestion={handleDismissConsolidation} // Placeholder
+            graphNodes={graphNodes} 
+            onApplyConsolidation={handleApplyConsolidation}
+            onDismissSuggestion={handleDismissConsolidation}
           />
         )}
 
@@ -310,3 +310,4 @@ export default function CascadeExplorerPage() {
     </div>
   );
 }
+
