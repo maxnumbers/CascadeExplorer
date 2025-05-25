@@ -1,5 +1,5 @@
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
-import { z } from 'genkit';
+import { z } from 'zod'; // Changed from 'genkit'
 // Import ReflectAssertionOutput type from its flow file, as it's not a shared schema object.
 import type { ReflectAssertionOutput as AIReflectAssertionOutputOriginal } from '@/ai/flows/assertion-reflection';
 // Import SuggestImpactConsolidationOutput type from its flow file.
