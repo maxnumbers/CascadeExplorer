@@ -10,26 +10,19 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+// Import Zod schemas from the shared types file
+import { ImpactMappingOutputSchema } from '@/types/cascade'; 
+import type { ImpactMappingOutput as ImpactMappingOutputType } from '@/types/cascade';
+
 
 const ImpactMappingInputSchema = z.object({
   assertion: z.string().describe('The initial assertion to map impacts for.'),
 });
 export type ImpactMappingInput = z.infer<typeof ImpactMappingInputSchema>;
 
-const ImpactSchema = z.object({
-  id: z.string().describe('Unique identifier for the impact.'),
-  label: z.string().describe('Short label for the impact (2-3 lines max).'),
-  description: z.string().describe('Detailed description of the impact.'),
-  validity: z.enum(['high', 'medium', 'low']).describe('Validity assessment (high/medium/low).'),
-  reasoning: z.string().describe('Reasoning for validity assessment.'),
-});
+// Export the TypeScript type derived from the imported Zod schema
+export type ImpactMappingOutput = ImpactMappingOutputType;
 
-const ImpactMappingOutputSchema = z.object({
-  firstOrder: z.array(ImpactSchema).describe('Immediate/direct impacts.'),
-  secondOrder: z.array(ImpactSchema).describe('Downstream effects.'),
-  thirdOrder: z.array(ImpactSchema).describe('Societal shifts.'),
-});
-export type ImpactMappingOutput = z.infer<typeof ImpactMappingOutputSchema>;
 
 export async function impactMapping(input: ImpactMappingInput): Promise<ImpactMappingOutput> {
   return impactMappingFlow(input);
@@ -38,7 +31,7 @@ export async function impactMapping(input: ImpactMappingInput): Promise<ImpactMa
 const prompt = ai.definePrompt({
   name: 'impactMappingPrompt',
   input: {schema: ImpactMappingInputSchema},
-  output: {schema: ImpactMappingOutputSchema},
+  output: {schema: ImpactMappingOutputSchema}, // Use imported schema
   prompt: `You are a Cascade Thinking System that helps users explore the cascading impacts of their ideas through interactive dialogue and visual networks.
 
   For the given assertion, identify 3-5 first-order impacts (immediate, direct effects).
@@ -50,6 +43,8 @@ const prompt = ai.definePrompt({
   - Medium: Plausible but uncertain timing/scale
   - Low: Possible but requires many assumptions
 
+  Assign a unique ID to each impact generated.
+
   Here is the assertion:
   {{assertion}}`,
 });
@@ -58,7 +53,7 @@ const impactMappingFlow = ai.defineFlow(
   {
     name: 'impactMappingFlow',
     inputSchema: ImpactMappingInputSchema,
-    outputSchema: ImpactMappingOutputSchema,
+    outputSchema: ImpactMappingOutputSchema, // Use imported schema
   },
   async input => {
     const {output} = await prompt(input);
