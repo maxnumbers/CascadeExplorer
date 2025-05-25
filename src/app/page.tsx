@@ -68,8 +68,11 @@ export default function CascadeExplorerPage() {
       order: 0,
       type: 'assertion',
     };
-    newGraphNodes.push(coreNode);
-    addedNodeIds.add(coreNode.id);
+    if (!addedNodeIds.has(coreNode.id)) {
+        newGraphNodes.push(coreNode);
+        addedNodeIds.add(coreNode.id);
+    }
+
 
     // 2. Process First-Order Impacts
     const firstOrderNodesProcessed: ImpactNode[] = [];
@@ -213,7 +216,7 @@ export default function CascadeExplorerPage() {
   
  const handleApplyConsolidation = (suggestion: ConsolidatedImpactSuggestion) => {
     const { originalImpactIds, consolidatedImpact: suggestedConsolidatedImpact } = suggestion;
-    const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 0 | 1 | 2 | 3; // Allow 0 for assertion if needed, though impacts are usually 1,2,3
+    const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 0 | 1 | 2 | 3;
 
     // 1. Update rawImpactMapData
     setRawImpactMapData(prevRawData => {
@@ -226,7 +229,7 @@ export default function CascadeExplorerPage() {
         updatedData.thirdOrder = updatedData.thirdOrder.filter(i => i.id !== idToRemove);
       });
       
-      const { order, ...impactForRawData } = suggestedConsolidatedImpact; // Exclude 'order' from raw data impact
+      const { order, ...impactForRawData } = suggestedConsolidatedImpact; 
 
       if (newConsolidatedImpactOrder === 1) updatedData.firstOrder.push(impactForRawData);
       else if (newConsolidatedImpactOrder === 2) updatedData.secondOrder.push(impactForRawData);
@@ -244,79 +247,61 @@ export default function CascadeExplorerPage() {
         description: suggestedConsolidatedImpact.description,
         validity: suggestedConsolidatedImpact.validity,
         reasoning: suggestedConsolidatedImpact.reasoning,
-        order: newConsolidatedImpactOrder, // Use the AI provided order
-        type: 'impact', // Consolidated nodes are impacts
+        order: newConsolidatedImpactOrder,
+        type: 'impact', 
       };
-      // Ensure the new node isn't already there (e.g. if IDs are not perfectly unique from AI)
       if (!filteredNodes.find(n => n.id === newGraphNode.id)) {
         return [...filteredNodes, newGraphNode];
       }
-      return filteredNodes.map(n => n.id === newGraphNode.id ? newGraphNode : n); // Replace if ID somehow existed
+      return filteredNodes.map(n => n.id === newGraphNode.id ? newGraphNode : n); 
     });
 
     // 3. Update graphLinks
     setGraphLinks(prevLinks => {
-      const newLinks: ImpactLink[] = [];
       const consolidatedNodeId = suggestedConsolidatedImpact.id;
       const tempLinks: {source: string, target: string}[] = [];
 
       for (const link of prevLinks) {
-        const sourceId = typeof link.source === 'object' ? (link.source as ImpactNode).id : link.source;
-        const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : link.target;
+        const sourceId = typeof link.source === 'object' ? (link.source as ImpactNode).id : String(link.source);
+        const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
 
         const sourceIsOriginal = originalImpactIds.includes(sourceId);
         const targetIsOriginal = originalImpactIds.includes(targetId);
 
         if (sourceIsOriginal && targetIsOriginal) {
-          // Link between two original nodes, gets removed
           continue;
         } else if (sourceIsOriginal) {
-          // Link from an original node to an external node (outgoing)
-          // Avoid duplicate links to the same target
           if (!tempLinks.find(l => l.source === consolidatedNodeId && l.target === targetId)) {
              tempLinks.push({ source: consolidatedNodeId, target: targetId });
           }
         } else if (targetIsOriginal) {
-          // Link from an external node to an original node (incoming)
-          // Avoid duplicate links from the same source
           if (!tempLinks.find(l => l.source === sourceId && l.target === consolidatedNodeId)) {
             tempLinks.push({ source: sourceId, target: consolidatedNodeId });
           }
         } else {
-          // Link not involving original nodes
           tempLinks.push({ source: sourceId, target: targetId });
         }
       }
       
-      // If the consolidated node has no links after rewiring,
-      // try to link it based on its order, similar to processImpactData.
-      // This is a fallback if it becomes orphaned.
-      const consolidatedNodeHasLinks = tempLinks.some(l => l.source === consolidatedNodeId || l.target === consolidatedNodeId);
-      if (!consolidatedNodeHasLinks && currentAssertion && reflectionResult && rawImpactMapData) {
-          // Re-evaluate based on its new order. This is simplistic.
-          // A better approach might be to ask the AI for parent after consolidation, or user specifies.
-          const tempNodesForLinking = graphNodes.filter(n => !originalImpactIds.includes(n.id));
-          if (!tempNodesForLinking.find(n => n.id === consolidatedNodeId)) {
-            // This should not happen if graphNodes was updated correctly
-          }
-          
+      const currentNodes = graphNodes.filter(n => !originalImpactIds.includes(n.id) && n.id !== consolidatedNodeId);
+      if (currentNodes.find(n=> n.id === 'core-assertion') && !tempLinks.some(l => l.source === consolidatedNodeId || l.target === consolidatedNodeId)) {
           if (newConsolidatedImpactOrder === 1) {
              if(!tempLinks.find(l => l.source === 'core-assertion' && l.target === consolidatedNodeId)) {
                 tempLinks.push({source: 'core-assertion', target: consolidatedNodeId});
              }
           } else if (newConsolidatedImpactOrder === 2) {
-            const potentialParents = tempNodesForLinking.filter(n => n.order === 1);
-            if (potentialParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) { // if no incoming links yet
-                tempLinks.push({source: potentialParents[0].id, target: consolidatedNodeId}); // Link to first available parent
+            const potentialParents = currentNodes.filter(n => n.order === 1);
+            if (potentialParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) { 
+                tempLinks.push({source: potentialParents[0].id, target: consolidatedNodeId}); 
             } else if (!tempLinks.find(l => l.source === 'core-assertion' && l.target === consolidatedNodeId)){
-                tempLinks.push({source: 'core-assertion', target: consolidatedNodeId}); // Fallback to core
+                tempLinks.push({source: 'core-assertion', target: consolidatedNodeId}); 
             }
           } else if (newConsolidatedImpactOrder === 3) {
-            const potentialParents = tempNodesForLinking.filter(n => n.order === 2);
+            const potentialParents = currentNodes.filter(n => n.order === 2);
             if (potentialParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) {
                 tempLinks.push({source: potentialParents[0].id, target: consolidatedNodeId});
             } else {
-                const fallbackParents = tempNodesForLinking.filter(n => n.order === 1);
+                const fallbackParents = currentNodes.filter(n => n.order === 1);
                 if (fallbackParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) {
                    tempLinks.push({source: fallbackParents[0].id, target: consolidatedNodeId});
                 } else if(!tempLinks.find(l => l.source === 'core-assertion' && l.target === consolidatedNodeId)) {
@@ -327,11 +312,15 @@ export default function CascadeExplorerPage() {
       }
       
       // Deduplicate links more robustly
-      const uniqueLinkStrings = new Set(tempLinks.map(l => `${l.source}-${l.target}`));
-      return Array.from(uniqueLinkStrings).map(s => {
-        const [source, target] = s.split('-');
-        return { source, target };
-      });
+      const uniqueLinks = new Map<string, { source: string; target: string }>();
+      const linkDelimiter = ":::"; // Use a delimiter unlikely to be in IDs
+      for (const link of tempLinks) {
+        const key = `${link.source}${linkDelimiter}${link.target}`;
+        if (!uniqueLinks.has(key)) {
+          uniqueLinks.set(key, { source: link.source, target: link.target });
+        }
+      }
+      return Array.from(uniqueLinks.values());
     });
     
     // 4. Update UI
@@ -469,3 +458,4 @@ export default function CascadeExplorerPage() {
   );
 }
 
+    
