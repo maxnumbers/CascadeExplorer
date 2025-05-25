@@ -26,7 +26,8 @@ const nextConfig: NextConfig = {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         async_hooks: false,
-        fs: false, // Add this line
+        fs: false,
+        tls: false, // Added fallback for 'tls'
       };
     }
     return config;
