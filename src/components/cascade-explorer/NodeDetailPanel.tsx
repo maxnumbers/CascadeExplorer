@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ImpactNode } from '@/types/cascade';
@@ -47,38 +48,37 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
       <DialogContent className="sm:max-w-[525px] bg-card text-card-foreground border-border shadow-xl">
         <DialogHeader>
           <DialogTitle className="text-2xl text-primary">{node.label}</DialogTitle>
-          <DialogDescription>{orderTextMap[node.order]}</DialogDescription>
+          <DialogDescription>{orderTextMap[node.order]} ({node.type})</DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] p-1">
           <div className="grid gap-4 py-4 pr-3">
             <div className="space-y-1">
-              <Label htmlFor="description" className="font-semibold">Description</Label>
-              <p id="description" className="text-sm text-muted-foreground_FIX_THIS_LATER_TODO">{node.description}</p> {/* Updated to a lighter text color for readability */}
+              <Label htmlFor="description" className="font-semibold text-primary">Description</Label>
+              <p id="description" className="text-sm text-muted-foreground">{node.description}</p>
             </div>
             <div className="space-y-1">
-              <Label htmlFor="reasoning" className="font-semibold">Reasoning for Validity</Label>
-              <p id="reasoning" className="text-sm text-muted-foreground_FIX_THIS_LATER_TODO">{node.reasoning}</p> {/* Updated to a lighter text color for readability */}
+              <Label htmlFor="reasoning" className="font-semibold text-primary">Reasoning for Validity</Label>
+              <p id="reasoning" className="text-sm text-muted-foreground">{node.reasoning}</p>
             </div>
-            {node.type === 'impact' && (
-              <div className="space-y-2">
-                <Label htmlFor="validity" className="font-semibold">Validity Assessment</Label>
-                <Select
-                  value={node.validity}
-                  onValueChange={handleValidityChange}
-                >
-                  <SelectTrigger id="validity" className="w-full">
-                    <SelectValue placeholder="Select validity" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VALIDITY_OPTIONS.map(option => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Allow validity update for 'assertion' type as well, if desired, or keep it restricted to 'impact' */}
+            <div className="space-y-2">
+              <Label htmlFor="validity" className="font-semibold text-primary">Validity Assessment</Label>
+              <Select
+                value={node.validity}
+                onValueChange={handleValidityChange}
+              >
+                <SelectTrigger id="validity" className="w-full bg-input text-foreground">
+                  <SelectValue placeholder="Select validity" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VALIDITY_OPTIONS.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </ScrollArea>
         <DialogFooter>
