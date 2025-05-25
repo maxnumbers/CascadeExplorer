@@ -54,9 +54,11 @@ export default function CascadeExplorerPage() {
   };
 
   const processImpactData = useCallback((assertionText: string, reflection: AIReflectAssertionOutput, impactData: AIImpactMappingOutput): { nodes: ImpactNode[], links: ImpactLink[] } => {
-    const nodes: ImpactNode[] = [];
-    const links: ImpactLink[] = [];
+    const newGraphNodes: ImpactNode[] = [];
+    const newGraphLinks: ImpactLink[] = [];
+    const addedNodeIds = new Set<string>();
 
+    // 1. Add Core Assertion Node
     const coreNode: ImpactNode = {
       id: 'core-assertion',
       label: reflection.summary || "Core Assertion",
@@ -66,62 +68,79 @@ export default function CascadeExplorerPage() {
       order: 0,
       type: 'assertion',
     };
-    nodes.push(coreNode);
-    
-    const addNodeAndLink = (impact: Impact, order: 1 | 2 | 3, parentId: string) => {
-        if (!nodes.find(n => n.id === impact.id)) {
-            const impactNode: ImpactNode = {
-                ...impact,
-                order,
-                type: 'impact',
-            };
-            nodes.push(impactNode);
-            links.push({ source: parentId, target: impact.id });
-        }
-    };
-    
+    newGraphNodes.push(coreNode);
+    addedNodeIds.add(coreNode.id);
+
+    // 2. Process First-Order Impacts
+    const firstOrderNodesProcessed: ImpactNode[] = [];
     impactData.firstOrder.forEach(fo => {
-        addNodeAndLink(fo, 1, coreNode.id);
+        if (!addedNodeIds.has(fo.id)) {
+            const nodeToAdd: ImpactNode = { ...fo, order: 1, type: 'impact' };
+            newGraphNodes.push(nodeToAdd);
+            newGraphLinks.push({ source: coreNode.id, target: fo.id });
+            addedNodeIds.add(fo.id);
+            firstOrderNodesProcessed.push(nodeToAdd);
+        }
     });
 
-    impactData.secondOrder.forEach(so => {
-        // Try to find a parent in firstOrder. This logic might need refinement if mapping isn't direct.
-        // For now, this assumes secondOrder impacts relate to firstOrder impacts primarily.
-        // A more robust solution would require the AI to specify parent IDs for second/third order impacts.
-        const potentialParentFoId = impactData.firstOrder.find(fo => so.id.startsWith(fo.id + "-"))?.id || coreNode.id; // Example heuristic
-        addNodeAndLink(so, 2, potentialParentFoId);
-    });
-
-    impactData.thirdOrder.forEach(to => {
-        const potentialParentSoId = impactData.secondOrder.find(so => to.id.startsWith(so.id + "-"))?.id || coreNode.id; // Example heuristic
-        addNodeAndLink(to, 3, potentialParentSoId);
-    });
-    
-    // A simple linking logic for now: connect based on array position if AI doesn't give parent info
-    // This needs to be improved if the AI output doesn't imply parentage
-    if (impactData.firstOrder.length > 0 && impactData.secondOrder.length > 0) {
+    // 3. Process Second-Order Impacts
+    const secondOrderNodesProcessed: ImpactNode[] = [];
+    if (firstOrderNodesProcessed.length > 0) {
         impactData.secondOrder.forEach((so, idx) => {
-            if (!links.find(l => l.target === so.id)) { // If not already linked by a more specific logic
-                 const parentFo = impactData.firstOrder[idx % impactData.firstOrder.length];
-                 if (parentFo && !links.find(l => l.source === parentFo.id && l.target === so.id)) {
-                    links.push({ source: parentFo.id, target: so.id });
-                 }
+            if (!addedNodeIds.has(so.id)) {
+                const nodeToAdd: ImpactNode = { ...so, order: 2, type: 'impact' };
+                newGraphNodes.push(nodeToAdd);
+                const parentNode = firstOrderNodesProcessed[idx % firstOrderNodesProcessed.length];
+                newGraphLinks.push({ source: parentNode.id, target: so.id });
+                addedNodeIds.add(so.id);
+                secondOrderNodesProcessed.push(nodeToAdd);
             }
         });
-    }
-    if (impactData.secondOrder.length > 0 && impactData.thirdOrder.length > 0) {
-         impactData.thirdOrder.forEach((to, idx) => {
-            if (!links.find(l => l.target === to.id)) {
-                const parentSo = impactData.secondOrder[idx % impactData.secondOrder.length];
-                if (parentSo && !links.find(l => l.source === parentSo.id && l.target === to.id)) {
-                    links.push({ source: parentSo.id, target: to.id });
-                }
+    } else { // Fallback: Link to core if no first-order impacts
+        impactData.secondOrder.forEach(so => {
+            if (!addedNodeIds.has(so.id)) {
+                const nodeToAdd: ImpactNode = { ...so, order: 2, type: 'impact' };
+                newGraphNodes.push(nodeToAdd);
+                newGraphLinks.push({ source: coreNode.id, target: so.id });
+                addedNodeIds.add(so.id);
+                secondOrderNodesProcessed.push(nodeToAdd);
             }
         });
     }
 
-
-    return { nodes, links };
+    // 4. Process Third-Order Impacts
+    if (secondOrderNodesProcessed.length > 0) {
+        impactData.thirdOrder.forEach((to, idx) => {
+            if (!addedNodeIds.has(to.id)) {
+                const nodeToAdd: ImpactNode = { ...to, order: 3, type: 'impact' };
+                newGraphNodes.push(nodeToAdd);
+                const parentNode = secondOrderNodesProcessed[idx % secondOrderNodesProcessed.length];
+                newGraphLinks.push({ source: parentNode.id, target: to.id });
+                addedNodeIds.add(to.id);
+            }
+        });
+    } else if (firstOrderNodesProcessed.length > 0) { // Fallback: Link to first-order if no second-order
+        impactData.thirdOrder.forEach((to, idx) => {
+            if (!addedNodeIds.has(to.id)) {
+                const nodeToAdd: ImpactNode = { ...to, order: 3, type: 'impact' };
+                newGraphNodes.push(nodeToAdd);
+                const parentNode = firstOrderNodesProcessed[idx % firstOrderNodesProcessed.length];
+                newGraphLinks.push({ source: parentNode.id, target: to.id });
+                addedNodeIds.add(to.id);
+            }
+        });
+    } else { // Fallback: Link to core if no first or second-order
+        impactData.thirdOrder.forEach(to => {
+            if (!addedNodeIds.has(to.id)) {
+                const nodeToAdd: ImpactNode = { ...to, order: 3, type: 'impact' };
+                newGraphNodes.push(nodeToAdd);
+                newGraphLinks.push({ source: coreNode.id, target: to.id });
+                addedNodeIds.add(to.id);
+            }
+        });
+    }
+    
+    return { nodes: newGraphNodes, links: newGraphLinks };
   }, []);
 
 
@@ -194,7 +213,7 @@ export default function CascadeExplorerPage() {
   
  const handleApplyConsolidation = (suggestion: ConsolidatedImpactSuggestion) => {
     const { originalImpactIds, consolidatedImpact: suggestedConsolidatedImpact } = suggestion;
-    const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 1 | 2 | 3;
+    const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 0 | 1 | 2 | 3; // Allow 0 for assertion if needed, though impacts are usually 1,2,3
 
     // 1. Update rawImpactMapData
     setRawImpactMapData(prevRawData => {
@@ -207,8 +226,7 @@ export default function CascadeExplorerPage() {
         updatedData.thirdOrder = updatedData.thirdOrder.filter(i => i.id !== idToRemove);
       });
       
-      // Create the impact object for rawData (without the AI's 'order' field)
-      const { order, ...impactForRawData } = suggestedConsolidatedImpact;
+      const { order, ...impactForRawData } = suggestedConsolidatedImpact; // Exclude 'order' from raw data impact
 
       if (newConsolidatedImpactOrder === 1) updatedData.firstOrder.push(impactForRawData);
       else if (newConsolidatedImpactOrder === 2) updatedData.secondOrder.push(impactForRawData);
@@ -226,37 +244,90 @@ export default function CascadeExplorerPage() {
         description: suggestedConsolidatedImpact.description,
         validity: suggestedConsolidatedImpact.validity,
         reasoning: suggestedConsolidatedImpact.reasoning,
-        order: newConsolidatedImpactOrder,
-        type: 'impact',
+        order: newConsolidatedImpactOrder, // Use the AI provided order
+        type: 'impact', // Consolidated nodes are impacts
       };
-      return [...filteredNodes, newGraphNode];
+      // Ensure the new node isn't already there (e.g. if IDs are not perfectly unique from AI)
+      if (!filteredNodes.find(n => n.id === newGraphNode.id)) {
+        return [...filteredNodes, newGraphNode];
+      }
+      return filteredNodes.map(n => n.id === newGraphNode.id ? newGraphNode : n); // Replace if ID somehow existed
     });
 
     // 3. Update graphLinks
     setGraphLinks(prevLinks => {
       const newLinks: ImpactLink[] = [];
       const consolidatedNodeId = suggestedConsolidatedImpact.id;
+      const tempLinks: {source: string, target: string}[] = [];
 
       for (const link of prevLinks) {
-        const sourceIsOriginal = originalImpactIds.includes(link.source as string);
-        const targetIsOriginal = originalImpactIds.includes(link.target as string);
+        const sourceId = typeof link.source === 'object' ? (link.source as ImpactNode).id : link.source;
+        const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : link.target;
+
+        const sourceIsOriginal = originalImpactIds.includes(sourceId);
+        const targetIsOriginal = originalImpactIds.includes(targetId);
 
         if (sourceIsOriginal && targetIsOriginal) {
           // Link between two original nodes, gets removed
           continue;
         } else if (sourceIsOriginal) {
-          // Link from an original node to an external node
-          newLinks.push({ source: consolidatedNodeId, target: link.target });
+          // Link from an original node to an external node (outgoing)
+          // Avoid duplicate links to the same target
+          if (!tempLinks.find(l => l.source === consolidatedNodeId && l.target === targetId)) {
+             tempLinks.push({ source: consolidatedNodeId, target: targetId });
+          }
         } else if (targetIsOriginal) {
-          // Link from an external node to an original node
-          newLinks.push({ source: link.source, target: consolidatedNodeId });
+          // Link from an external node to an original node (incoming)
+          // Avoid duplicate links from the same source
+          if (!tempLinks.find(l => l.source === sourceId && l.target === consolidatedNodeId)) {
+            tempLinks.push({ source: sourceId, target: consolidatedNodeId });
+          }
         } else {
           // Link not involving original nodes
-          newLinks.push(link);
+          tempLinks.push({ source: sourceId, target: targetId });
         }
       }
-      // Deduplicate links
-      const uniqueLinkStrings = new Set(newLinks.map(l => `${l.source}-${l.target}`));
+      
+      // If the consolidated node has no links after rewiring,
+      // try to link it based on its order, similar to processImpactData.
+      // This is a fallback if it becomes orphaned.
+      const consolidatedNodeHasLinks = tempLinks.some(l => l.source === consolidatedNodeId || l.target === consolidatedNodeId);
+      if (!consolidatedNodeHasLinks && currentAssertion && reflectionResult && rawImpactMapData) {
+          // Re-evaluate based on its new order. This is simplistic.
+          // A better approach might be to ask the AI for parent after consolidation, or user specifies.
+          const tempNodesForLinking = graphNodes.filter(n => !originalImpactIds.includes(n.id));
+          if (!tempNodesForLinking.find(n => n.id === consolidatedNodeId)) {
+            // This should not happen if graphNodes was updated correctly
+          }
+          
+          if (newConsolidatedImpactOrder === 1) {
+             if(!tempLinks.find(l => l.source === 'core-assertion' && l.target === consolidatedNodeId)) {
+                tempLinks.push({source: 'core-assertion', target: consolidatedNodeId});
+             }
+          } else if (newConsolidatedImpactOrder === 2) {
+            const potentialParents = tempNodesForLinking.filter(n => n.order === 1);
+            if (potentialParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) { // if no incoming links yet
+                tempLinks.push({source: potentialParents[0].id, target: consolidatedNodeId}); // Link to first available parent
+            } else if (!tempLinks.find(l => l.source === 'core-assertion' && l.target === consolidatedNodeId)){
+                tempLinks.push({source: 'core-assertion', target: consolidatedNodeId}); // Fallback to core
+            }
+          } else if (newConsolidatedImpactOrder === 3) {
+            const potentialParents = tempNodesForLinking.filter(n => n.order === 2);
+            if (potentialParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) {
+                tempLinks.push({source: potentialParents[0].id, target: consolidatedNodeId});
+            } else {
+                const fallbackParents = tempNodesForLinking.filter(n => n.order === 1);
+                if (fallbackParents.length > 0 && !tempLinks.find(l => l.target === consolidatedNodeId)) {
+                   tempLinks.push({source: fallbackParents[0].id, target: consolidatedNodeId});
+                } else if(!tempLinks.find(l => l.source === 'core-assertion' && l.target === consolidatedNodeId)) {
+                   tempLinks.push({source: 'core-assertion', target: consolidatedNodeId});
+                }
+            }
+          }
+      }
+      
+      // Deduplicate links more robustly
+      const uniqueLinkStrings = new Set(tempLinks.map(l => `${l.source}-${l.target}`));
       return Array.from(uniqueLinkStrings).map(s => {
         const [source, target] = s.split('-');
         return { source, target };
@@ -397,3 +468,4 @@ export default function CascadeExplorerPage() {
     </div>
   );
 }
+
