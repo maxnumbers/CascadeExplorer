@@ -21,7 +21,6 @@ const GenerateImpactsByOrderInputSchema = z.object({
 });
 export type GenerateImpactsByOrderInput = z.infer<typeof GenerateImpactsByOrderInputSchema>;
 
-// Output schema now implicitly uses the updated ImpactSchema which includes structured keyConcepts, attributes, and causalReasoning
 const GenerateImpactsByOrderOutputSchema = z.object({
   generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its structured `keyConcepts` (name, type), `attributes`, and potentially `causalReasoning` explaining its link to the parent.'),
 });
@@ -39,7 +38,8 @@ const prompt = ai.definePrompt({
 The overall assertion we are exploring is: "{{assertionText}}"
 
 {{#if isTargetOrder1}}
-Based *only* on the assertion "{{assertionText}}", identify 3-5 distinct first-order impacts (immediate, direct effects).
+Based *only* on the assertion "{{assertionText}}", identify 3-5 distinct and varied first-order impacts (immediate, direct effects).
+Ensure each impact represents a unique consequence, avoiding repetition.
 Do not generate second or third order impacts yet. For these first-order impacts, the 'parentId' and 'causalReasoning' fields are not applicable.
 {{/if}}
 
@@ -48,8 +48,8 @@ We have the following first-order impacts stemming from the assertion "{{asserti
 {{#each parentImpacts}}
 - Parent Impact (1st Order) ID {{id}}, Label: "{{label}}", Description: "{{description}}"
 {{/each}}
-For each of these first-order parent impacts, identify 2-3 distinct second-order effects.
-Ensure the second-order effects are logical consequences of their specific parent impact and the overall assertion.
+For each of these first-order parent impacts, identify 2-3 distinct and varied second-order effects.
+Ensure each effect is a unique consequence of its specific parent impact and the overall assertion, avoiding repetition of ideas already covered.
 For each second-order impact you generate:
   - You MUST include a 'parentId' field in its data, set to the 'id' of the specific first-order parent impact it directly stems from.
   - You MUST include a 'causalReasoning' field, briefly explaining *why* this new impact is a direct consequence of its specified 'parentId' impact.
@@ -61,8 +61,8 @@ We have the following second-order impacts, which ultimately stem from the asser
 {{#each parentImpacts}}
 - Parent Impact (2nd Order) ID {{id}}, Label: "{{label}}", Description: "{{description}}"
 {{/each}}
-For each of these second-order parent impacts, identify 1-2 distinct third-order societal shifts or long-term consequences.
-Ensure the third-order effects are logical consequences of their specific parent impact and the overall assertion.
+For each of these second-order parent impacts, identify 1-2 distinct and varied third-order societal shifts or long-term consequences.
+Ensure each consequence is a unique outcome of its specific parent impact and the overall assertion, avoiding repetition.
 For each third-order impact you generate:
   - You MUST include a 'parentId' field in its data, set to the 'id' of the specific second-order parent impact it directly stems from.
   - You MUST include a 'causalReasoning' field, briefly explaining *why* this new impact is a direct consequence of its specified 'parentId' impact.
