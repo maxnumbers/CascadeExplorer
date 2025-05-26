@@ -1,8 +1,9 @@
+
 "use client";
 
 import type { ImpactNode, ImpactLink } from '@/types/cascade';
 import { NODE_COLORS } from '@/types/cascade';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react'; // Removed useState
 import * as d3 from 'd3';
 
 interface NetworkGraphProps {
@@ -15,113 +16,140 @@ interface NetworkGraphProps {
 
 const NetworkGraph: React.FC<NetworkGraphProps> = ({ nodes: initialNodes, links: initialLinks, onNodeClick, width = 800, height = 600 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [nodes, setNodes] = useState<ImpactNode[]>([]);
-  const [links, setLinks] = useState<ImpactLink[]>([]);
 
   useEffect(() => {
-    setNodes(initialNodes.map(n => ({...n}))); // Create copies for D3 simulation
-    setLinks(initialLinks.map(l => ({...l})));
-  }, [initialNodes, initialLinks]);
-  
-  useEffect(() => {
-    if (!svgRef.current || nodes.length === 0) return;
+    if (!svgRef.current || initialNodes.length === 0) {
+      // Clear previous graph if no nodes
+      if (svgRef.current) {
+        d3.select(svgRef.current).selectAll("*").remove();
+      }
+      return;
+    }
+
+    // Make mutable copies for D3 simulation as D3 modifies these objects
+    // Also ensure D3 specific properties like x, y, fx, fy are preserved if they exist from previous simulations or manual setting
+    const d3Nodes: ImpactNode[] = initialNodes.map(n => ({ 
+        ...n, 
+        x: n.x, 
+        y: n.y, 
+        vx: n.vx, 
+        vy: n.vy, 
+        fx: n.fx, 
+        fy: n.fy 
+    }));
+    const d3Links: ImpactLink[] = initialLinks.map(l => ({ ...l }));
+
 
     const svg = d3.select(svgRef.current)
       .attr('viewBox', [-width / 2, -height / 2, width, height].join(' '))
       .style('max-width', '100%')
       .style('height', 'auto');
 
-    svg.selectAll("*").remove(); // Clear previous graph
+    svg.selectAll("*").remove(); // Clear previous graph parts to prevent duplicates
 
-    const simulation = d3.forceSimulation<ImpactNode>(nodes)
-      .force("link", d3.forceLink<ImpactNode, ImpactLink>(links).id(d => d.id).distance(d => (d.source as ImpactNode).order === 0 || (d.target as ImpactNode).order === 0 ? 150 : 100))
-      .force("charge", d3.forceManyBody().strength(-300))
-      .force("center", d3.forceCenter(0,0).strength(0.1)) // Adjusted center force strength
-      .force("x", d3.forceX().strength(0.05)) // Weaker X positioning force
-      .force("y", d3.forceY().strength(0.05)); // Weaker Y positioning force
+    const simulation = d3.forceSimulation<ImpactNode>(d3Nodes)
+      .force("link", d3.forceLink<ImpactNode, ImpactLink>(d3Links).id((d: any) => d.id).distance(d => ((d.source as ImpactNode).order === 0 || (d.target as ImpactNode).order === 0 ? 150 : 100)))
+      .force("charge", d3.forceManyBody().strength(-350)) 
+      .force("center", d3.forceCenter(0,0).strength(0.05)) 
+      .force("x", d3.forceX().strength(0.03)) 
+      .force("y", d3.forceY().strength(0.03));
 
 
-    const link = svg.append("g")
-      .attr("stroke", "hsl(var(--border))") // Use border color for links
+    const linkGroup = svg.append("g")
+      .attr("class", "links");
+
+    const nodeGroup = svg.append("g")
+        .attr("class", "nodes");
+
+    const labelGroup = svg.append("g")
+        .attr("class", "labels");
+
+    const linkElements = linkGroup
+      .attr("stroke", "hsl(var(--border))") 
       .attr("stroke-opacity", 0.6)
       .selectAll("line")
-      .data(links)
+      .data(d3Links, (d: any) => `${typeof d.source === 'object' ? d.source.id : d.source}-${typeof d.target === 'object' ? d.target.id : d.target}`) // Key for links
       .join("line")
-      .attr("stroke-width", d => Math.sqrt(3)); // Fixed stroke width
+      .attr("stroke-width", 1.5);
 
-    const nodeRadius = (d: ImpactNode) => d.order === 0 ? 20 : 12;
+    const nodeRadius = (d: ImpactNode) => d.order === 0 ? 18 : 10; 
 
-    const node = svg.append("g")
-      .attr("stroke", "hsl(var(--background))") // Use background for stroke
+    const nodeElements = nodeGroup
+      .attr("stroke", "hsl(var(--card))") // Stroke color that contrasts with node fill
       .attr("stroke-width", 1.5)
       .selectAll("circle")
-      .data(nodes)
+      .data(d3Nodes, (d: ImpactNode) => d.id) // Key for nodes
       .join("circle")
       .attr("r", nodeRadius)
-      .attr("fill", d => NODE_COLORS[d.order] || 'hsl(var(--muted))')
-      .on("click", (event, d) => {
-        onNodeClick(d);
+      .attr("fill", d => d.originalColor || NODE_COLORS[d.order] || 'hsl(var(--muted))')
+      .on("click", (event, d_typed) => {
+        onNodeClick(d_typed as ImpactNode);
       })
       .call(drag(simulation) as any);
 
-    node.append("title")
-      .text(d => d.label);
+    nodeElements.append("title")
+      .text(d => `${d.label}\nOrder: ${d.order}\nValidity: ${d.validity}\nID: ${d.id}`); // Added ID to title for debugging
       
-    const labels = svg.append("g")
+    const labelElements = labelGroup
       .selectAll("text")
-      .data(nodes)
+      .data(d3Nodes, (d: ImpactNode) => d.id) // Key for labels
       .join("text")
       .text(d => d.label)
-      .attr("font-size", "10px")
+      .attr("font-size", "9px") 
       .attr("fill", "hsl(var(--foreground))")
       .attr("text-anchor", "middle")
-      .attr("dy", d => `${nodeRadius(d) + 12}px`) // Position below the node
-      .style("pointer-events", "none"); // So labels don't interfere with node click/drag
+      .attr("paint-order", "stroke") // Render stroke behind fill
+      .attr("stroke", "hsl(var(--card))") 
+      .attr("stroke-width", "0.3em") // Adjust for desired outline thickness
+      .attr("stroke-linejoin", "round")
+      .attr("dy", d => `${nodeRadius(d) + 10}px`) 
+      .style("pointer-events", "none"); 
 
 
     simulation.on("tick", () => {
-      link
-        .attr("x1", d => (d.source as ImpactNode).x!)
-        .attr("y1", d => (d.source as ImpactNode).y!)
-        .attr("x2", d => (d.target as ImpactNode).x!)
-        .attr("y2", d => (d.target as ImpactNode).y!);
+      linkElements
+        .attr("x1", d => (d.source as ImpactNode).x || 0) // Fallback to 0 if undefined
+        .attr("y1", d => (d.source as ImpactNode).y || 0)
+        .attr("x2", d => (d.target as ImpactNode).x || 0)
+        .attr("y2", d => (d.target as ImpactNode).y || 0);
 
-      node
-        .attr("cx", d => d.x!)
-        .attr("cy", d => d.y!);
+      nodeElements
+        .attr("cx", d => d.x || 0)
+        .attr("cy", d => d.y || 0);
       
-      labels
-        .attr("x", d => d.x!)
-        .attr("y", d => d.y!);
+      labelElements
+        .attr("x", d => d.x || 0)
+        .attr("y", d => d.y || 0);
     });
+    
+    simulation.alpha(0.3).restart();
+
 
     const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
-        .scaleExtent([0.3, 5])
+        .scaleExtent([0.2, 5]) 
         .on("zoom", (event) => {
             const { transform } = event;
-            svg.selectAll('g').attr("transform", transform.toString());
+            linkGroup.attr("transform", transform.toString());
+            nodeGroup.attr("transform", transform.toString());
+            labelGroup.attr("transform", transform.toString());
         });
     
     svg.call(zoomBehavior);
-    
-    // Apply initial zoom to fit (optional, can be tricky to get right)
-    // Example: center graph, but might need adjustments
-    // const initialTransform = d3.zoomIdentity.translate(width / 2, height / 2).scale(0.8);
-    // svg.call(zoomBehavior.transform, initialTransform);
+    // svg.call(zoomBehavior.transform, d3.zoomIdentity); // Uncomment to reset zoom on redraw
 
 
     return () => {
       simulation.stop();
     };
 
-  }, [nodes, links, width, height, onNodeClick]);
+  }, [initialNodes, initialLinks, width, height, onNodeClick]);
 
 
   function drag(simulation: d3.Simulation<ImpactNode, undefined>) {
     function dragstarted(event: d3.D3DragEvent<SVGCircleElement, ImpactNode, ImpactNode>, d: ImpactNode) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
+      d.fx = d.x; // Pin node by setting fixed x
+      d.fy = d.y; // Pin node by setting fixed y
     }
     
     function dragged(event: d3.D3DragEvent<SVGCircleElement, ImpactNode, ImpactNode>, d: ImpactNode) {
@@ -131,8 +159,9 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ nodes: initialNodes, links:
     
     function dragended(event: d3.D3DragEvent<SVGCircleElement, ImpactNode, ImpactNode>, d: ImpactNode) {
       if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
+      // To unpin after drag, set fx and fy to null. If you want them to stay pinned, leave as is.
+      // d.fx = null; 
+      // d.fy = null;
     }
     
     return d3.drag<SVGCircleElement, ImpactNode>()
@@ -150,3 +179,5 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({ nodes: initialNodes, links:
 };
 
 export default NetworkGraph;
+
+    
