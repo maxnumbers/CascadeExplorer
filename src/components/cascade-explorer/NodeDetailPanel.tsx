@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 interface NodeDetailPanelProps {
   node: ImpactNode | null;
@@ -43,12 +44,16 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
     3: "Third-Order Impact",
   };
 
+  const nodeTypeDisplay = node.nodeSystemType === 'CORE_ASSERTION' ? 'Core Assertion' :
+                          node.nodeSystemType === 'GENERATED_IMPACT' ? 'Generated Impact' :
+                          node.nodeSystemType; // Fallback to the string itself
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[525px] bg-card text-card-foreground border-border shadow-xl">
         <DialogHeader>
           <DialogTitle className="text-2xl text-primary">{node.label}</DialogTitle>
-          <DialogDescription>{orderTextMap[node.order]} ({node.type})</DialogDescription>
+          <DialogDescription>{orderTextMap[node.order]} ({nodeTypeDisplay})</DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[60vh] p-1">
           <div className="grid gap-4 py-4 pr-3">
@@ -60,7 +65,27 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
               <Label htmlFor="reasoning" className="font-semibold text-primary">Reasoning for Validity</Label>
               <p id="reasoning" className="text-sm text-muted-foreground">{node.reasoning}</p>
             </div>
-            {/* Allow validity update for 'assertion' type as well, if desired, or keep it restricted to 'impact' */}
+            
+            {node.properties && Object.keys(node.properties).length > 0 && (
+              <div className="space-y-2 border-t border-border pt-3 mt-3">
+                <h4 className="font-semibold text-primary mb-1">Additional Properties:</h4>
+                {Object.entries(node.properties).map(([key, value]) => (
+                  <div key={key} className="text-sm">
+                    <span className="font-medium text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1')}: </span>
+                    {Array.isArray(value) ? (
+                      <ul className="list-disc list-inside ml-4">
+                        {value.map((item, index) => (
+                          <li key={index} className="text-foreground">{String(item)}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-foreground">{String(value)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="validity" className="font-semibold text-primary">Validity Assessment</Label>
               <Select

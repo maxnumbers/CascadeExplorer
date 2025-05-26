@@ -25,6 +25,7 @@ const ReflectAssertionOutputSchema = z.object({
   reflection: z.string().describe('The AI-generated reflection of the user assertion.'),
   summary: z.string().describe('A very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.'),
   coreComponents: z.array(z.string()).describe('Key elements of the assertion.'),
+  keyConcepts: z.array(z.string()).describe('A list of key concepts, entities, or main nouns mentioned in the assertion.'),
   confirmationQuestion: z.string().describe('A question to confirm understanding with the user.'),
 });
 export type ReflectAssertionOutput = z.infer<typeof ReflectAssertionOutputSchema>;
@@ -44,7 +45,8 @@ You will receive an assertion from the user. Your task is to:
 1.  Create a concise summary of the assertion, ideally 5-10 words, suitable as a short title (for the 'summary' field).
 2.  Provide a more detailed reflection of the assertion in 1-2 clear sentences (for the 'reflection' field).
 3.  Identify the core components of the assertion (usually 2-3 main parts).
-4.  Generate a question to confirm your understanding with the user.
+4.  Identify a list of key concepts, entities, or main nouns mentioned in the assertion (for the 'keyConcepts' field).
+5.  Generate a question to confirm your understanding with the user.
 
 Here is the assertion:
 

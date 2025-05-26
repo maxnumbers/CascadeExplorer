@@ -54,7 +54,8 @@ export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOrigi
 
 export interface ImpactNode extends Impact, SimulationNodeDatum {
   order: 0 | 1 | 2 | 3; // 0 for core assertion
-  type: 'assertion' | 'impact';
+  nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT' | string; // More flexible for future NodeRAG types
+  properties?: Record<string, any>; // For additional data like keywords, entities, etc.
   originalColor?: string;
 }
 
@@ -87,7 +88,7 @@ export enum ExplorerStep {
   ORDER_2_REVIEW = 'order_2_review',
   ORDER_3_PENDING = 'order_3_pending',
   ORDER_3_REVIEW = 'order_3_review',
-  GENERATING_SUMMARY = 'generating_summary', // New step for summary generation
-  FINAL_REVIEW = 'final_review', // After summary is generated, or if user skips summary. Now represents the true end.
+  GENERATING_SUMMARY = 'generating_summary',
+  FINAL_REVIEW = 'final_review',
   CONSOLIDATION_PENDING = 'consolidation_pending',
 }
