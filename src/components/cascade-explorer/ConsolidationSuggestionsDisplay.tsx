@@ -3,6 +3,7 @@
 
 import type { SuggestImpactConsolidationOutput, ConsolidatedImpactSuggestion } from '@/ai/flows/suggest-impact-consolidation';
 import type { ImpactNode } from '@/types/cascade';
+import { NODE_COLORS } from '@/types/cascade';
 import {
   Accordion,
   AccordionContent,
@@ -12,11 +13,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Merge, CheckCircle2, XCircle } from 'lucide-react'; // Removed AlertCircle as it was unused
+import { Merge, CheckCircle2, XCircle } from 'lucide-react';
 
 interface ConsolidationSuggestionsDisplayProps {
   suggestions: SuggestImpactConsolidationOutput | null;
-  graphNodes: ImpactNode[]; // To look up original node details
+  graphNodes: ImpactNode[]; 
   onApplyConsolidation: (suggestion: ConsolidatedImpactSuggestion) => void;
   onDismissSuggestion: (suggestionId: string) => void;
 }
@@ -81,88 +82,119 @@ export function ConsolidationSuggestionsDisplay({
           <p className="text-muted-foreground">No consolidation opportunities found by the AI.</p>
         ) : (
           <Accordion type="single" collapsible className="w-full">
-            {suggestions.consolidationSuggestions.map((suggestion, index) => (
-              <AccordionItem value={`item-${index}`} key={suggestion.consolidatedImpact.id || `suggestion-${index}`} className="border-border">
-                <AccordionTrigger className="hover:no-underline text-left">
-                  <div className="flex flex-col">
-                     <span className="font-semibold text-primary">{getTriggerLabel(suggestion)}</span>
-                     <span className="text-xs text-muted-foreground mt-1">
-                        Confidence: <Badge variant={getConfidenceVariant(suggestion.confidence)} className="ml-1">{suggestion.confidence}</Badge>
-                     </span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-6 p-4 bg-background/30 rounded-md border border-border mt-1">
-                  
-                  <div>
-                    <h4 className="font-semibold text-accent mb-2">Original Impacts to Consolidate:</h4>
-                    <ul className="space-y-3">
-                      {suggestion.originalImpactIds.map(id => {
-                        const originalNode = graphNodes.find(n => n.id === id);
-                        return (
-                          <li key={id} className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
-                            <div>
-                                <strong className="text-primary">Label:</strong>
-                                <span className="ml-2 text-foreground">{originalNode?.label || id}</span>
-                            </div>
-                            <div>
-                                <strong className="text-primary">Description:</strong>
-                                <span className="ml-2 text-sm text-muted-foreground">{originalNode?.description || 'N/A'}</span>
-                            </div>
-                            <div>
-                                <strong className="text-primary">Current Validity:</strong> 
-                                <Badge variant={getValidityBadgeVariant(originalNode?.validity)} className="ml-1">{originalNode?.validity || 'N/A'}</Badge>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                  
-                  <div className="border-t border-border my-4"></div>
+            {suggestions.consolidationSuggestions.map((suggestion, index) => {
+              const orderNumber = parseInt(suggestion.consolidatedImpact.order, 10);
+              const orderColor = NODE_COLORS[orderNumber] || 'hsl(var(--border))';
 
-                  <div className="space-y-1">
-                    <h4 className="font-semibold text-accent mb-2">Proposed Consolidated Impact:</h4>
-                    <div className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
-                        <div>
-                            <strong className="text-sm text-primary">New Label:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.label}</span>
-                        </div>
-                        <div>
-                            <strong className="text-sm text-primary">New Description:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.description}</span>
-                        </div>
-                        <div>
-                            <strong className="text-sm text-primary">Proposed Validity:</strong> <Badge variant={getValidityBadgeVariant(suggestion.consolidatedImpact.validity)} className="ml-1">{suggestion.consolidatedImpact.validity}</Badge>
-                            <span className="text-xs text-muted-foreground ml-2">(Reasoning: {suggestion.consolidatedImpact.reasoning})</span>
-                        </div>
+              return (
+                <AccordionItem 
+                  value={`item-${index}`} 
+                  key={suggestion.consolidatedImpact.id || `suggestion-${index}`} 
+                  className="border-border"
+                  style={{ borderLeft: `4px solid ${orderColor}`, marginBottom: '0.5rem', borderRadius:'var(--radius)' }}
+                >
+                  <AccordionTrigger 
+                    className="hover:no-underline text-left px-3 py-3"
+                  >
+                    <div className="flex flex-col w-full">
+                       <span className="font-semibold text-primary">{getTriggerLabel(suggestion)}</span>
+                       <div className="text-xs text-muted-foreground mt-1 flex items-center">
+                          <span>Confidence: <Badge variant={getConfidenceVariant(suggestion.confidence)} className="ml-1">{suggestion.confidence}</Badge></span>
+                          <span className="ml-3">Order: <Badge style={{ backgroundColor: orderColor, color: 'hsl(var(--primary-foreground))'}} className="ml-1">{suggestion.consolidatedImpact.order}</Badge></span>
+                       </div>
                     </div>
-                  </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-6 p-4 bg-background/30 rounded-md border border-input mt-1">
+                    
+                    <div>
+                      <h4 className="font-semibold text-accent mb-2">Original Impacts to Consolidate:</h4>
+                      <ul className="space-y-3">
+                        {suggestion.originalImpactIds.map(id => {
+                          const originalNode = graphNodes.find(n => n.id === id);
+                          return (
+                            <li key={id} className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
+                              <div>
+                                  <strong className="text-primary">Label:</strong>
+                                  <span className="ml-2 text-foreground">{originalNode?.label || id}</span>
+                              </div>
+                              <div>
+                                  <strong className="text-primary">Description:</strong>
+                                  <span className="ml-2 text-sm text-muted-foreground">{originalNode?.description || 'N/A'}</span>
+                              </div>
+                              <div>
+                                  <strong className="text-primary">Current Validity:</strong> 
+                                  <Badge variant={getValidityBadgeVariant(originalNode?.validity)} className="ml-1">{originalNode?.validity || 'N/A'}</Badge>
+                              </div>
+                               <div>
+                                  <strong className="text-primary">Order:</strong> 
+                                  <Badge 
+                                    style={{ backgroundColor: originalNode ? NODE_COLORS[originalNode.order] : 'hsl(var(--border))', color: 'hsl(var(--primary-foreground))'}} 
+                                    className="ml-1"
+                                  >
+                                    {originalNode?.order || 'N/A'}
+                                  </Badge>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                    
+                    <div className="border-t border-border my-4"></div>
 
-                  <div className="border-t border-border my-4"></div>
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-accent mb-2">Proposed Consolidated Impact:</h4>
+                      <div className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
+                          <div>
+                              <strong className="text-sm text-primary">New Label:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.label}</span>
+                          </div>
+                          <div>
+                              <strong className="text-sm text-primary">New Description:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.description}</span>
+                          </div>
+                          <div>
+                              <strong className="text-sm text-primary">Proposed Validity:</strong> <Badge variant={getValidityBadgeVariant(suggestion.consolidatedImpact.validity)} className="ml-1">{suggestion.consolidatedImpact.validity}</Badge>
+                              <span className="text-xs text-muted-foreground ml-2">(Reasoning: {suggestion.consolidatedImpact.reasoning})</span>
+                          </div>
+                          <div>
+                            <strong className="text-sm text-primary">Proposed Order:</strong> 
+                            <Badge 
+                                style={{ backgroundColor: NODE_COLORS[parseInt(suggestion.consolidatedImpact.order)], color: 'hsl(var(--primary-foreground))'}} 
+                                className="ml-1"
+                            >
+                                {suggestion.consolidatedImpact.order}
+                            </Badge>
+                          </div>
+                      </div>
+                    </div>
 
-                  <div>
-                    <h4 className="font-semibold text-accent mb-1">AI's Rationale:</h4>
-                    <p className="text-sm text-muted-foreground"><strong className="text-primary">Reason for Consolidation:</strong> {suggestion.reasoningForConsolidation}</p>
-                  </div>
+                    <div className="border-t border-border my-4"></div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                    <Button 
-                      size="sm" 
-                      onClick={() => onApplyConsolidation(suggestion)}
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 flex-grow sm:flex-grow-0"
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" /> Apply Consolidation
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      onClick={() => onDismissSuggestion(suggestion.consolidatedImpact.id)}
-                      className="flex-grow sm:flex-grow-0"
-                    >
-                      <XCircle className="mr-2 h-4 w-4" /> Dismiss
-                    </Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+                    <div>
+                      <h4 className="font-semibold text-accent mb-1">AI's Rationale:</h4>
+                      <p className="text-sm text-muted-foreground"><strong className="text-primary">Reason for Consolidation:</strong> {suggestion.reasoningForConsolidation}</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                      <Button 
+                        size="sm" 
+                        onClick={() => onApplyConsolidation(suggestion)}
+                        className="bg-primary text-primary-foreground hover:bg-primary/90 flex-grow sm:flex-grow-0"
+                      >
+                        <CheckCircle2 className="mr-2 h-4 w-4" /> Apply Consolidation
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => onDismissSuggestion(suggestion.consolidatedImpact.id)}
+                        className="flex-grow sm:flex-grow-0"
+                      >
+                        <XCircle className="mr-2 h-4 w-4" /> Dismiss
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )
+            })}
           </Accordion>
         )}
       </CardContent>

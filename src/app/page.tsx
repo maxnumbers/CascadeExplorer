@@ -77,6 +77,7 @@ export default function CascadeExplorerPage() {
     let currentReviewStep: ExplorerStep = ExplorerStep.ORDER_1_REVIEW;
     let parentImpactsForAI: Impact[] = [];
     let parentNodesForLinking: ImpactNode[] = [];
+    // Use the ref to get the latest snapshot of nodes for this operation
     const currentNodesSnapshot = allImpactNodesRef.current;
 
 
@@ -84,10 +85,12 @@ export default function CascadeExplorerPage() {
       case 1:
         currentLoadingStep = ExplorerStep.ORDER_1_PENDING;
         currentReviewStep = ExplorerStep.ORDER_1_REVIEW;
+        // For 1st order, parentNodesForLinking should be the core assertion node
         const coreNodeFromSnapshot = currentNodesSnapshot.find(n => n.id === CORE_ASSERTION_ID);
         if (coreNodeFromSnapshot) {
             parentNodesForLinking = [coreNodeFromSnapshot]; 
         } else {
+            // This case should ideally not be hit if handleConfirmReflectionAndFetchFirstOrder ran correctly
             console.error("Core assertion node not found when preparing for 1st order impacts. This should not happen if handleConfirmReflection ran.");
             toast({ title: "Error", description: "Core assertion node missing. Cannot generate 1st order impacts.", variant: "destructive" });
             setUiStep(ExplorerStep.REFLECTION_REVIEW); // Revert to a safe state
@@ -150,7 +153,8 @@ export default function CascadeExplorerPage() {
       setGraphLinks(prevLinks => {
         const newLinksGeneratedThisStep: ImpactLink[] = [];
         if (targetOrder === 1) {
-            // Directly use CORE_ASSERTION_ID as D3 will resolve it from the nodes prop
+            // The core node must exist in allImpactNodesRef.current at this point
+            // D3 will resolve the string ID "CORE_ASSERTION_ID" from the nodes prop.
             newNodesFromAI.forEach(newNode => {
                 newLinksGeneratedThisStep.push({ source: CORE_ASSERTION_ID, target: newNode.id });
             });
@@ -175,6 +179,7 @@ export default function CascadeExplorerPage() {
           });
         }
         
+        // Deduplicate links: Create a map using a composite key, then convert map values back to an array.
         const linkMap = new Map(prevLinks.map(l => [`${typeof l.source === 'string' ? l.source : l.source.id}-${typeof l.target === 'string' ? l.target : l.target.id}`, l]));
         newLinksGeneratedThisStep.forEach(l => linkMap.set(`${typeof l.source === 'string' ? l.source : l.source.id}-${typeof l.target === 'string' ? l.target : l.target.id}`, l));
         return Array.from(linkMap.values());
@@ -189,7 +194,7 @@ export default function CascadeExplorerPage() {
       else if (targetOrder === 3) setUiStep(ExplorerStep.ORDER_2_REVIEW);
       else setUiStep(ExplorerStep.INITIAL);
     }
-  }, [currentAssertionText, toast ]);
+  }, [currentAssertionText, toast ]); // Removed allImpactNodes from dependency as we use ref
 
 
   const handleConfirmReflectionAndFetchFirstOrder = useCallback(async () => {
@@ -211,6 +216,7 @@ export default function CascadeExplorerPage() {
     setGraphLinks([]); // Reset links
     
     // Ensure state update is processed before proceeding
+    // This helps React batch and process the state update so the ref gets updated
     await Promise.resolve(); 
     
     await fetchImpactsForOrder(1);
@@ -280,6 +286,7 @@ export default function CascadeExplorerPage() {
     if (selectedNode && selectedNode.id === nodeId) {
       setSelectedNode(prev => prev ? {...prev, validity} : null);
     }
+    // Use the ref to get the latest label for the toast
     const nodeLabel = allImpactNodesRef.current.find(n => n.id === nodeId)?.label || nodeId;
     toast({ title: "Validity Updated", description: `Node "${nodeLabel}" validity set to ${validity}.`});
   };
@@ -296,6 +303,10 @@ export default function CascadeExplorerPage() {
         reasoning: suggestedConsolidatedImpact.reasoning,
         order: newConsolidatedImpactOrder,
         type: 'impact', 
+        // If AI provides a parentId for the consolidated node, use it.
+        // This is especially important if consolidating e.g. 2nd order impacts, the new node should still know its 1st order parent.
+        // The AI prompt for consolidation doesn't currently ask for this, but could be enhanced.
+        // For now, parentId on consolidated node will be undefined, and linking below will handle it.
         parentId: suggestedConsolidatedImpact.parentId 
     };
 
@@ -311,74 +322,89 @@ export default function CascadeExplorerPage() {
     let childLinksToReParent: ImpactLink[] = []; 
     let parentLinksToReParent: ImpactLink[] = []; 
 
+    // Process existing links
     currentLinksSnapshot.forEach(link => {
         const sourceId = typeof link.source === 'object' ? link.source.id : String(link.source);
         const targetId = typeof link.target === 'object' ? link.target.id : String(link.target);
 
         if (originalImpactIds.includes(sourceId) && originalImpactIds.includes(targetId)) {
-            // Skip links internal to the consolidated group
+            // Skip links internal to the consolidated group (both source and target are being removed)
         } else if (originalImpactIds.includes(sourceId)) { 
+            // This link's source is being removed, so its target becomes a child of the new consolidated node
             childLinksToReParent.push({ source: newGraphNode.id, target: targetId });
         } else if (originalImpactIds.includes(targetId)) { 
+            // This link's target is being removed, so its source becomes a parent of the new consolidated node
             parentLinksToReParent.push({ source: sourceId, target: newGraphNode.id });
         } else {
-            finalNewLinks.push(link); 
+            finalNewLinks.push(link); // This link is unaffected by the consolidation
         }
     });
     
     finalNewLinks.push(...childLinksToReParent, ...parentLinksToReParent);
     
     // Ensure the new consolidated node has at least one parent link if it's not the core assertion
+    // and it doesn't already have one from parentLinksToReParent
     const hasParentLink = finalNewLinks.some(l => (typeof l.target === 'object' ? l.target.id : String(l.target)) === newGraphNode.id);
     
     if (!hasParentLink && newGraphNode.id !== CORE_ASSERTION_ID && newGraphNode.order > 0) {
-        // Try to link to its specified parentId if valid within the new node set
+        // Try to link to its specified parentId if AI provided it and it exists in nextNodes
         if (newGraphNode.parentId && nextNodes.some(n => n.id === newGraphNode.parentId && n.order === newGraphNode.order -1)) {
             finalNewLinks.push({ source: newGraphNode.parentId, target: newGraphNode.id });
         } else if (newGraphNode.order === 1) {
-             // Link to core assertion if it's a 1st order impact and not already linked
-             if (!finalNewLinks.some(l => String(l.target) === newGraphNode.id && String(l.source) === CORE_ASSERTION_ID)) {
-                finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
-             }
+             // Link to core assertion if it's a 1st order impact
+             finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
         } else { 
             // Fallback: find any suitable parent from the previous order in the 'nextNodes' list
             const potentialParents = nextNodes.filter(n => n.order === newGraphNode.order - 1 && n.id !== newGraphNode.id);
             if (potentialParents.length > 0) {
-                 // Ensure it's not already linked as a target
-                 if (!finalNewLinks.some(l => String(l.target) === newGraphNode.id)) { 
-                    finalNewLinks.push({ source: potentialParents[0].id, target: newGraphNode.id }); 
-                 }
+                finalNewLinks.push({ source: potentialParents[0].id, target: newGraphNode.id }); 
             } else { // If no parents in previous order, link to core (e.g., if all previous order nodes were consolidated into this one)
-                if (!finalNewLinks.some(l => String(l.target) === newGraphNode.id && String(l.source) === CORE_ASSERTION_ID)){
-                    finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
-                }
+                finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
             }
         }
     }
   
+    // Deduplicate links
     const uniqueLinks = new Map<string, ImpactLink>();
     finalNewLinks.forEach(link => {
       const src = typeof link.source === 'object' ? link.source.id : String(link.source);
       const tgt = typeof link.target === 'object' ? link.target.id : String(link.target);
       if (src === tgt) return; // Avoid self-loops
-      uniqueLinks.set(`${src}:::${tgt}`, { source: src, target: tgt }); // Use a robust delimiter
+      uniqueLinks.set(`${src}:::${tgt}`, { source: src, target: tgt }); 
     });
     const dedupedFinalNewLinks = Array.from(uniqueLinks.values());
 
     setAllImpactNodes(nextNodes);
     setGraphLinks(dedupedFinalNewLinks);
     
+    let dependentSuggestionsRemovedCount = 0;
     setConsolidationSuggestions(prev => {
       if (!prev) return null;
+      const suggestionsToKeep = prev.consolidationSuggestions.filter(s => {
+        if (s.consolidatedImpact.id === suggestion.consolidatedImpact.id) {
+          return false; // Remove the applied suggestion
+        }
+        // Check if this other suggestion references any of the originalImpactIds that were just consolidated
+        const isDependent = s.originalImpactIds.some(id => originalImpactIds.includes(id));
+        if (isDependent) {
+          dependentSuggestionsRemovedCount++;
+          return false; // Remove dependent suggestion
+        }
+        return true; // Keep this suggestion
+      });
       return {
         ...prev,
-        consolidationSuggestions: prev.consolidationSuggestions.filter(s => s.consolidatedImpact.id !== suggestion.consolidatedImpact.id)
+        consolidationSuggestions: suggestionsToKeep
       };
     });
 
+    let toastMessage = `Impacts consolidated into "${suggestion.consolidatedImpact.label}". Graph updated.`;
+    if (dependentSuggestionsRemovedCount > 0) {
+      toastMessage += ` ${dependentSuggestionsRemovedCount} dependent suggestion(s) were also removed.`;
+    }
     toast({ 
       title: "Consolidation Applied", 
-      description: `Impacts consolidated into "${suggestion.consolidatedImpact.label}". Graph updated.`
+      description: toastMessage
     });
   };
 
@@ -397,9 +423,12 @@ export default function CascadeExplorerPage() {
   };
 
   const visibleNodes = useMemo(() => {
-    const currentNodes = allImpactNodes; // Use state directly for memoization dependency
+    // Directly use state for dependencies, but read from ref inside for up-to-date values
+    // if other parts of the memo are complex. Here, it's simple enough to use state directly.
+    const currentNodes = allImpactNodes; 
     if (uiStep === ExplorerStep.INITIAL || uiStep === ExplorerStep.REFLECTION_PENDING) return [];
     if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) {
+      // Show only core assertion node
       return currentNodes.filter(n => n.order === 0);
     }
     if (uiStep === ExplorerStep.ORDER_1_PENDING || uiStep === ExplorerStep.ORDER_1_REVIEW) {
@@ -412,14 +441,15 @@ export default function CascadeExplorerPage() {
       return currentNodes.filter(n => n.order <= 3);
     }
     // Default to showing all nodes if in final review or consolidation pending (after generation)
-    if (uiStep === ExplorerStep.FINAL_REVIEW || uiStep === ExplorerStep.CONSOLIDATION_PENDING) {
+    if (uiStep === ExplorerStep.FINAL_REVIEW || (uiStep === ExplorerStep.CONSOLIDATION_PENDING && uiStep !== ExplorerStep.INITIAL) ) {
         return currentNodes;
     }
-    return currentNodes; 
+    return currentNodes; // Fallback, should ideally be covered by above
   }, [uiStep, reflectionResult, allImpactNodes]);
 
   const visibleLinks = useMemo(() => {
-    const currentLinks = graphLinks; // Use state directly
+    // Use state directly for dependency
+    const currentLinks = graphLinks; 
     if (!visibleNodes.length) return [];
     const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
     return currentLinks.filter(link => {
@@ -466,7 +496,10 @@ export default function CascadeExplorerPage() {
       case ExplorerStep.ORDER_2_REVIEW:
       case ExplorerStep.ORDER_3_REVIEW:
       case ExplorerStep.FINAL_REVIEW:
+        // For rendering, use the state variable directly as it's fresh for this render pass
         const nodesForThisRenderPass = allImpactNodes; 
+        // Check if there are enough impacts of *any* type ('impact') for consolidation.
+        // The AI flow itself checks for enough impacts *per order*.
         const canSuggestConsolidationsNow = nodesForThisRenderPass.filter(n => n.type === 'impact').length >= 2;
 
         const nextOrderMap = {
@@ -509,7 +542,7 @@ export default function CascadeExplorerPage() {
             {consolidationSuggestions && consolidationSuggestions.consolidationSuggestions.length > 0 && (
               <ConsolidationSuggestionsDisplay 
                 suggestions={consolidationSuggestions}
-                graphNodes={nodesForThisRenderPass} 
+                graphNodes={nodesForThisRenderPass} // Pass current render's nodes
                 onApplyConsolidation={handleApplyConsolidation}
                 onDismissSuggestion={handleDismissConsolidation}
               />
@@ -535,7 +568,8 @@ export default function CascadeExplorerPage() {
     if (uiStep === ExplorerStep.INITIAL || (uiStep === ExplorerStep.REFLECTION_INPUT && !reflectionResult)) return "Enter an assertion to begin exploring its cascading impacts.";
     if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Core assertion reflected by AI. Confirm to generate first-order impacts.";
     
-    const currentNodes = allImpactNodes; // Use state for description
+    // Use state directly for description consistency with visibleNodes/links
+    const currentNodes = allImpactNodes; 
     if (currentNodes.length > 0 && (uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.INITIAL)) {
         let orderText = 'all'; 
         if (uiStep === ExplorerStep.ORDER_1_REVIEW || uiStep === ExplorerStep.ORDER_1_PENDING) {
@@ -580,6 +614,7 @@ export default function CascadeExplorerPage() {
 
         {renderStepContent()}
         
+        {/* Ensure visibleNodes is populated before rendering graph */}
         {visibleNodes.length > 0 && (uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_PENDING) && (
           <Card className="shadow-xl bg-card flex-grow flex flex-col min-h-[600px] mt-6">
             <CardHeader>
