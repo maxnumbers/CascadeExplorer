@@ -46,7 +46,10 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
 
   const nodeTypeDisplay = node.nodeSystemType === 'CORE_ASSERTION' ? 'Core Assertion' :
                           node.nodeSystemType === 'GENERATED_IMPACT' ? 'Generated Impact' :
-                          node.nodeSystemType; // Fallback to the string itself
+                          node.nodeSystemType;
+
+  // Explicitly extract known properties for structured display
+  const { fullAssertionText, coreComponents, keyConcepts, attributes, ...otherProperties } = node.properties || {};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -59,17 +62,50 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
           <div className="grid gap-4 py-4 pr-3">
             <div className="space-y-1">
               <Label htmlFor="description" className="font-semibold text-primary">Description</Label>
-              <p id="description" className="text-sm text-muted-foreground">{node.description}</p>
+              <p id="description" className="text-sm text-muted-foreground whitespace-pre-wrap">{node.description}</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="reasoning" className="font-semibold text-primary">Reasoning for Validity</Label>
-              <p id="reasoning" className="text-sm text-muted-foreground">{node.reasoning}</p>
+              <p id="reasoning" className="text-sm text-muted-foreground whitespace-pre-wrap">{node.reasoning}</p>
             </div>
+
+            {node.nodeSystemType === 'CORE_ASSERTION' && fullAssertionText && (
+                <div className="space-y-1 border-t border-border pt-3 mt-3">
+                    <Label className="font-semibold text-primary">Full Assertion Text</Label>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fullAssertionText}</p>
+                </div>
+            )}
+            {node.nodeSystemType === 'CORE_ASSERTION' && coreComponents && coreComponents.length > 0 && (
+                 <div className="space-y-1 border-t border-border pt-3 mt-3">
+                    <Label className="font-semibold text-primary">Core Components</Label>
+                    <ul className="list-disc list-inside ml-4 text-sm text-muted-foreground">
+                        {coreComponents.map((item, index) => <li key={`core-${index}`}>{item}</li>)}
+                    </ul>
+                </div>
+            )}
+
+            {keyConcepts && Array.isArray(keyConcepts) && keyConcepts.length > 0 && (
+              <div className="space-y-1 border-t border-border pt-3 mt-3">
+                <Label className="font-semibold text-primary">Key Concepts</Label>
+                <div className="flex flex-wrap gap-1">
+                    {keyConcepts.map((item, index) => <Badge key={`kc-${index}`} variant="secondary">{item}</Badge>)}
+                </div>
+              </div>
+            )}
+
+            {attributes && Array.isArray(attributes) && attributes.length > 0 && (
+              <div className="space-y-1 border-t border-border pt-3 mt-3">
+                <Label className="font-semibold text-primary">Attributes</Label>
+                 <div className="flex flex-wrap gap-1">
+                    {attributes.map((item, index) => <Badge key={`attr-${index}`} variant="outline">{item}</Badge>)}
+                </div>
+              </div>
+            )}
             
-            {node.properties && Object.keys(node.properties).length > 0 && (
+            {Object.keys(otherProperties).length > 0 && (
               <div className="space-y-2 border-t border-border pt-3 mt-3">
-                <h4 className="font-semibold text-primary mb-1">Additional Properties:</h4>
-                {Object.entries(node.properties).map(([key, value]) => (
+                <h4 className="font-semibold text-primary mb-1">Other Properties:</h4>
+                {Object.entries(otherProperties).map(([key, value]) => (
                   <div key={key} className="text-sm">
                     <span className="font-medium text-muted-foreground capitalize">{key.replace(/([A-Z])/g, ' $1')}: </span>
                     {Array.isArray(value) ? (

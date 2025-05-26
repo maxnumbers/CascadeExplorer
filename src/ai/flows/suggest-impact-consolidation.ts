@@ -21,14 +21,15 @@ export type SuggestImpactConsolidationInput = SuggestImpactConsolidationInputTyp
 
 const ConsolidatedImpactSuggestionSchema = z.object({
   originalImpactIds: z.array(z.string()).describe("IDs of the impacts (all from the same order) suggested for consolidation."),
-  consolidatedImpact: ImpactSchema.extend({ 
+  consolidatedImpact: ImpactSchema.extend({
     id: z.string().describe("A proposed unique ID for the new consolidated impact (e.g., consolidated-1st-impact-1)."),
-    order: z.enum(['1', '2', '3']).describe("The hierarchical order (1st, 2nd, or 3rd) this consolidated impact belongs to. This MUST be the same as the order of the originalImpactIds.")
-  }).describe("The suggested new consolidated impact, synthesizing the originals. Its order must match the order of the original impacts."),
+    order: z.enum(['1', '2', '3']).describe("The hierarchical order (1st, 2nd, or 3rd) this consolidated impact belongs to. This MUST be the same as the order of the originalImpactIds."),
+    // keyConcepts and attributes are already part of ImpactSchema and should be synthesized by the AI
+  }).describe("The suggested new consolidated impact, synthesizing the originals. Its order must match the order of the original impacts. It should include synthesized keyConcepts and attributes."),
   confidence: z.enum(['high', 'medium', 'low']).describe("Confidence in this consolidation suggestion (high, medium, low)."),
   reasoningForConsolidation: z.string().describe("Explanation why these impacts (within the same order) can be consolidated.")
 });
-export type ConsolidatedImpactSuggestion = z.infer<typeof ConsolidatedImpactSuggestionSchema>; 
+export type ConsolidatedImpactSuggestion = z.infer<typeof ConsolidatedImpactSuggestionSchema>;
 
 const SuggestImpactConsolidationOutputSchema = z.object({
   consolidationSuggestions: z.array(ConsolidatedImpactSuggestionSchema).describe("List of suggestions for consolidating impacts. Returns empty if no suitable consolidations are found.")
@@ -42,26 +43,26 @@ export async function suggestImpactConsolidation(input: SuggestImpactConsolidati
 
 const consolidationPrompt = ai.definePrompt({
   name: 'suggestImpactConsolidationPrompt',
-  input: {schema: SuggestImpactConsolidationInputSchema}, 
+  input: {schema: SuggestImpactConsolidationInputSchema},
   output: {schema: SuggestImpactConsolidationOutputSchema},
   prompt: `You are an AI assistant skilled in identifying conceptual overlaps and redundancies in a structured list of impacts.
 Your goal is to help simplify an impact map by suggesting consolidations of impacts that are truly similar or represent different expressions of the same core idea *within their specific hierarchical order*.
 
-Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion:
+Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion. Each impact may have associated key concepts and attributes:
 
 First-Order Impacts:
 {{#each firstOrder}}
-- ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
+- ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
 {{/each}}
 
 Second-Order Impacts:
 {{#each secondOrder}}
-- ID: {{id}}, ParentID (from 1st order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
+- ID: {{id}}, ParentID (from 1st order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
 {{/each}}
 
 Third-Order Impacts:
 {{#each thirdOrder}}
-- ID: {{id}}, ParentID (from 2nd order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
+- ID: {{id}}, ParentID (from 2nd order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
 {{/each}}
 
 Your task is to:
@@ -79,40 +80,47 @@ Your task is to:
         iii. \`description\`: A comprehensive description that synthesizes the original impacts' descriptions.
         iv. \`validity\`: An estimated validity ('high', 'medium', 'low') for the consolidated impact, carefully considered based on the validities of the original impacts.
         v. \`reasoning\`: A brief explanation for the consolidated impact's validity assessment.
-        vi. \`parentId\`: This field is tricky for consolidated impacts. If ALL original impacts share the SAME parentId (from the preceding order), then use that parentId. If they have DIFFERENT parentIds, or if it's a 1st order consolidation (no parentId applicable), then OMIT the parentId field for the consolidatedImpact or set it to null/undefined. The application will handle linking it appropriately based on its order.
+        vi. \`parentId\`: If ALL original impacts share the SAME parentId (from the preceding order), then use that parentId. If they have DIFFERENT parentIds, or if it's a 1st order consolidation (no parentId applicable), then OMIT the parentId field for the consolidatedImpact or set it to null/undefined. The application will handle linking it appropriately based on its order.
+        vii. \`keyConcepts\`: Synthesize a new list of key concepts (2-4) for the consolidated impact, drawing from the original impacts' key concepts.
+        viii. \`attributes\`: Synthesize a new list of attributes (1-2) for the consolidated impact, drawing from the original impacts' attributes.
     c. \`confidence\`: Your confidence ('high', 'medium', 'low') that this consolidation is appropriate and meaningful.
     d. \`reasoningForConsolidation\`: A brief explanation of why these specific impacts (from the same order) can be consolidated, highlighting the shared theme or redundancy.
 5.  If no such groups are found within any order, return an empty list for \`consolidationSuggestions\`.
 
-Focus on strong semantic similarity and thematic convergence within each order. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order.
+Focus on strong semantic similarity and thematic convergence within each order. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order. The synthesized keyConcepts and attributes for the consolidated impact are crucial.
 `,
 });
 
 const suggestImpactConsolidationFlow = ai.defineFlow(
   {
     name: 'suggestImpactConsolidationFlow',
-    inputSchema: SuggestImpactConsolidationInputSchema, 
+    inputSchema: SuggestImpactConsolidationInputSchema,
     outputSchema: SuggestImpactConsolidationOutputSchema,
   },
   async (input) => {
     if (!input.firstOrder && !input.secondOrder && !input.thirdOrder) {
          return { consolidationSuggestions: [] };
     }
-    if (input.firstOrder?.length === 0 && input.secondOrder?.length === 0 && input.thirdOrder?.length === 0) {
+    // Ensure arrays are present even if empty for the prompt to avoid Handlebars errors
+    const promptInput = {
+        firstOrder: input.firstOrder || [],
+        secondOrder: input.secondOrder || [],
+        thirdOrder: input.thirdOrder || [],
+    };
+
+    if (promptInput.firstOrder.length === 0 && promptInput.secondOrder.length === 0 && promptInput.thirdOrder.length === 0) {
       return { consolidationSuggestions: [] };
     }
-    // Add a check to ensure at least one order has enough impacts for potential consolidation
-    const canConsolidateFirst = (input.firstOrder?.length || 0) >= 2;
-    const canConsolidateSecond = (input.secondOrder?.length || 0) >= 2;
-    const canConsolidateThird = (input.thirdOrder?.length || 0) >= 2;
+
+    const canConsolidateFirst = promptInput.firstOrder.length >= 2;
+    const canConsolidateSecond = promptInput.secondOrder.length >= 2;
+    const canConsolidateThird = promptInput.thirdOrder.length >= 2;
 
     if (!canConsolidateFirst && !canConsolidateSecond && !canConsolidateThird) {
-        // If no single order has at least two impacts, no consolidation is possible according to the new rules.
         return { consolidationSuggestions: [] };
     }
 
-    const {output} = await consolidationPrompt(input);
+    const {output} = await consolidationPrompt(promptInput);
     return output!;
   }
 );
-
