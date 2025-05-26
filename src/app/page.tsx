@@ -3,9 +3,9 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { reflectAssertion, type AIReflectAssertionOutput } from '@/ai/flows/assertion-reflection';
-import { generateImpactsByOrder, type GenerateImpactsByOrderInput } from '@/ai/flows/generate-impacts-by-order';
+import { generateImpactsByOrder, type GenerateImpactsByOrderInput, type AIGenerateImpactsByOrderOutput } from '@/ai/flows/generate-impacts-by-order';
 import { suggestImpactConsolidation, type SuggestImpactConsolidationOutput, type ConsolidatedImpactSuggestion } from '@/ai/flows/suggest-impact-consolidation';
-import { generateCascadeSummary, type CascadeSummaryInput } from '@/ai/flows/generate-cascade-summary';
+import { generateCascadeSummary, type CascadeSummaryInput, type CascadeSummaryOutput } from '@/ai/flows/generate-cascade-summary';
 import type { ImpactNode, ImpactLink, Impact, ImpactMappingInputForConsolidation, StructuredConcept } from '@/types/cascade';
 import { ExplorerStep } from '@/types/cascade';
 import { AssertionInputForm } from '@/components/cascade-explorer/AssertionInputForm';
@@ -91,21 +91,18 @@ export default function CascadeExplorerPage() {
     let currentReviewStep: ExplorerStep = ExplorerStep.ORDER_1_REVIEW;
     let parentImpactsForAI: Impact[] = [];
     
-    // Use the ref for up-to-date node list
     const currentNodesSnapshot = allImpactNodesRef.current;
     let parentNodesForLinking: ImpactNode[] = [];
-
 
     switch (targetOrder) {
       case 1:
         currentLoadingStep = ExplorerStep.ORDER_1_PENDING;
         currentReviewStep = ExplorerStep.ORDER_1_REVIEW;
-        // Core node is the parent for 1st order impacts
         const coreNodeFromSnapshot = currentNodesSnapshot.find(n => n.id === CORE_ASSERTION_ID);
         if (coreNodeFromSnapshot) {
             parentNodesForLinking = [coreNodeFromSnapshot]; 
         } else {
-            console.error("Critical: Core assertion node not found when preparing for 1st order impacts.");
+            console.error("Critical: Core assertion node not found when preparing for 1st order impacts. Current nodes:", JSON.stringify(currentNodesSnapshot.map(n => n.id)));
             toast({ title: "Error", description: "Core assertion node missing. Cannot generate 1st order impacts.", variant: "destructive" });
             setUiStep(ExplorerStep.REFLECTION_REVIEW); 
             return;
@@ -141,7 +138,7 @@ export default function CascadeExplorerPage() {
         targetOrder: String(targetOrder) as '1' | '2' | '3',
         parentImpacts: parentImpactsForAI.length > 0 ? parentImpactsForAI : undefined,
       };
-      const result = await generateImpactsByOrder(aiInput);
+      const result: AIGenerateImpactsByOrderOutput = await generateImpactsByOrder(aiInput);
 
       const rawGeneratedImpacts = result.generatedImpacts || [];
       
@@ -154,10 +151,9 @@ export default function CascadeExplorerPage() {
         return hasEssentialFields;
       });
 
-
       if (validGeneratedImpacts.length < rawGeneratedImpacts.length) {
         const diff = rawGeneratedImpacts.length - validGeneratedImpacts.length;
-        console.warn(`Filtered out ${diff} malformed impact(s) from AI generation due to missing essential fields (ID, Label, Description, Validity, or Reasoning for Validity).`);
+        console.warn(`Filtered out ${diff} malformed impact(s) from AI generation due to missing essential fields (ID, Label, Description, Validity, or Reasoning for Validity). Raw:`, rawGeneratedImpacts.filter(i => !validGeneratedImpacts.includes(i)));
         toast({
           title: "AI Data Inconsistency",
           description: `${diff} impact(s) from AI were incomplete (missing essential fields) and have been ignored.`,
@@ -183,7 +179,6 @@ export default function CascadeExplorerPage() {
             attributes: impact.attributes || [],
         },
       }));
-
 
       if (newNodesFromAI.length === 0 && rawGeneratedImpacts.length > 0) {
          toast({
@@ -211,13 +206,13 @@ export default function CascadeExplorerPage() {
       const fallbackNotifications: Array<{ label: string }> = [];
 
       if (targetOrder === 1) {
-          // parentNodesForLinking should contain the coreNode
-          if (parentNodesForLinking.length > 0 && parentNodesForLinking[0].id === CORE_ASSERTION_ID) {
+          const coreNodeForLinking = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
+          if (coreNodeForLinking) {
               newNodesFromAI.forEach(newNode => {
-                  newLinksGeneratedThisStep.push({ source: CORE_ASSERTION_ID, target: newNode.id });
+                  newLinksGeneratedThisStep.push({ source: coreNodeForLinking.id, target: newNode.id });
               });
           } else {
-               console.error("Critical: Core assertion node (parentNodesForLinking[0]) not found or incorrect when attempting to link 1st order impacts.");
+               console.error("Critical: Core assertion node not found for linking 1st order impacts when creating links. allImpactNodesRef.current IDs:", allImpactNodesRef.current.map(n => n.id));
           }
       } else if (targetOrder > 1 && parentNodesForLinking.length > 0) {
         newNodesFromAI.forEach((newNode) => {
@@ -227,23 +222,33 @@ export default function CascadeExplorerPage() {
             parentLinked = true;
           }
 
-          if (!parentLinked && parentNodesForLinking.length > 0) {
-            // Fallback: Link to the first available parent of the correct preceding order
-            const fallbackParent = parentNodesForLinking[0]; 
-            newLinksGeneratedThisStep.push({ source: fallbackParent.id, target: newNode.id });
-            console.warn(`Impact node "${newNode.label}" (ID: ${newNode.id}, Order ${targetOrder}) linked to fallback parent "${fallbackParent.label}" (ID: ${fallbackParent.id}) as AI did not provide a specific valid parentId or the specific parent was not in this step's list of potential parents.`);
+          if (!parentLinked) { // Fallback if not specifically linked by AI or parentId was invalid
+            const fallbackParent = parentNodesForLinking[0]; // Default to first available parent
+            const linkToAdd = { source: fallbackParent.id, target: newNode.id };
+            
+            console.log('[DEBUG] Fallback Linking Event Triggered:');
+            console.log('[DEBUG]   Target Order Being Generated:', targetOrder);
+            console.log('[DEBUG]   NewNode (Child):', JSON.stringify({id: newNode.id, label: newNode.label, order: newNode.order, parentIdAI: newNode.parentId}));
+            console.log('[DEBUG]   Chosen FallbackParent (Source):', JSON.stringify({id: fallbackParent.id, label: fallbackParent.label, order: fallbackParent.order}));
+            console.log('[DEBUG]   Link Being Added to newLinksGeneratedThisStep:', JSON.stringify(linkToAdd));
+            console.log('[DEBUG]   Full list of ParentNodesForLinking for this step:', JSON.stringify(parentNodesForLinking.map(p => ({id: p.id, label: p.label, order: p.order}))));
+
+            newLinksGeneratedThisStep.push(linkToAdd);
             fallbackNotifications.push({ label: newNode.label });
+            console.warn(`Impact node "${newNode.label}" (ID: ${newNode.id}, Order ${targetOrder}) linked to fallback parent "${fallbackParent.label}" (ID: ${fallbackParent.id}) as AI did not provide a specific valid parentId or the specific parent was not in this step's list of potential parents. AI ParentID: ${newNode.parentId}`);
           } else if (!parentLinked && parentNodesForLinking.length === 0) { 
               console.error(`Cannot link impact node "${newNode.label}" (ID: ${newNode.id}, Order ${targetOrder}) as no parent nodes were available for linking.`);
           }
         });
       }
       
+      console.log('[DEBUG] newLinksGeneratedThisStep before setGraphLinks:', JSON.stringify(newLinksGeneratedThisStep));
+
       setGraphLinks(prevLinks => {
         const linkMap = new Map(prevLinks.map(l => {
             const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
             const targetId = typeof l.target === 'string' ? l.target : l.target.id;
-            return [`${sourceId}:::${targetId}`, l]; // Use ::: as delimiter
+            return [`${sourceId}:::${targetId}`, l]; 
         }));
         newLinksGeneratedThisStep.forEach(l => {
             const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
@@ -286,7 +291,7 @@ export default function CascadeExplorerPage() {
       order: 0,
       nodeSystemType: 'CORE_ASSERTION',
       keyConcepts: reflectionResult.keyConcepts || [], 
-      attributes: reflectionResult.attributes || [],  // Assuming reflectionResult might have attributes
+      attributes: reflectionResult.attributes || [], 
       causalReasoning: undefined,
       properties: {
         fullAssertionText: currentAssertionText,
@@ -305,18 +310,18 @@ export default function CascadeExplorerPage() {
 
 
   const mapImpactNodeToImpact = (node: ImpactNode): Impact => {
-    // Destructure D3 and UI-specific fields to exclude them
     const { 
-        x, y, vx, vy, fx, fy, index, originalColor, // D3 fields
-        nodeSystemType, // UI/system fields
-        properties, // UI properties bag
-        ...impactData // Spread the rest, which should align with ImpactSchema + order
+        x, y, vx, vy, fx, fy, index, originalColor, 
+        nodeSystemType, 
+        properties, 
+        ...impactData 
     } = node;
     
     return {
-        ...impactData, // Contains id, label, description, validity, reasoning, parentId, order, causalReasoning
-        keyConcepts: node.keyConcepts || [], // Ensure it's always an array
-        attributes: node.attributes || [],   // Ensure it's always an array
+        ...impactData, 
+        keyConcepts: node.keyConcepts || [], 
+        attributes: node.attributes || [],   
+        causalReasoning: node.causalReasoning,
     };
   };
 
@@ -343,7 +348,7 @@ export default function CascadeExplorerPage() {
     };
 
     try {
-        const result = await generateCascadeSummary(summaryInput);
+        const result: CascadeSummaryOutput = await generateCascadeSummary(summaryInput);
         setCascadeSummary(result.narrativeSummary);
         toast({title: "Narrative Summary Generated", description: "The AI has summarized the impact cascade."});
         setUiStep(ExplorerStep.FINAL_REVIEW);
@@ -399,29 +404,25 @@ export default function CascadeExplorerPage() {
     setUiStep(ExplorerStep.CONSOLIDATION_PENDING);
     try {
       const result = await suggestImpactConsolidation(impactsForConsolidation);
-      const currentNodesSnapshot = allImpactNodesRef.current; // For order checking
+      const currentNodesSnapshot = allImpactNodesRef.current; 
 
       const validSuggestions = (result.consolidationSuggestions || []).filter(suggestion => {
         if (!suggestion.originalImpactIds || suggestion.originalImpactIds.length < 2) {
-          console.warn("AI suggested consolidation with <2 originalImpactIds:", suggestion);
+          console.warn("AI suggested consolidation with <2 originalImpactIds (client-side filter):", suggestion);
           return false;
         }
         
-        // Check if all original nodes exist and get their orders
-        const originalNodeOrders = suggestion.originalImpactIds.map(id => {
-          const node = currentNodesSnapshot.find(n => n.id === id);
-          return node ? node.order : -1; // -1 if node not found
-        }).filter(order => order !== -1); // Filter out not found nodes for order checking
+        const originalNodes = suggestion.originalImpactIds.map(id => currentNodesSnapshot.find(n => n.id === id)).filter(Boolean) as ImpactNode[];
 
-        if (originalNodeOrders.length !== suggestion.originalImpactIds.length) {
-          console.warn("AI suggested consolidation with non-existent originalImpactIds:", suggestion);
-          return false; // Some original nodes don't exist
+        if (originalNodes.length !== suggestion.originalImpactIds.length) {
+          console.warn("AI suggested consolidation with non-existent originalImpactIds (client-side filter):", suggestion);
+          return false; 
         }
 
-        if (originalNodeOrders.length === 0) return false; // Should not happen if length check passed
+        if (originalNodes.length === 0) return false;
 
-        const firstOriginalOrder = originalNodeOrders[0];
-        const allSameOrder = originalNodeOrders.every(order => order === firstOriginalOrder);
+        const firstOriginalOrder = originalNodes[0].order;
+        const allSameOrder = originalNodes.every(node => node.order === firstOriginalOrder);
         if (!allSameOrder) {
           console.warn("AI suggested consolidation across different orders (client-side filter):", suggestion);
           return false;
@@ -438,7 +439,7 @@ export default function CascadeExplorerPage() {
 
       if (validSuggestions.length < (result.consolidationSuggestions || []).length) {
         const invalidCount = (result.consolidationSuggestions || []).length - validSuggestions.length;
-        console.warn(`AI suggested ${invalidCount} consolidation(s) that were invalid (e.g. missing originalImpactIds, <2 impacts, cross-order, or order mismatch). These have been filtered out.`);
+        console.warn(`AI suggested ${invalidCount} consolidation(s) that were invalid. These have been filtered out.`);
          toast({ title: "AI Data Filtered", description: `${invalidCount} invalid consolidation suggestion(s) from AI were ignored.`, variant: "default" });
       }
 
@@ -485,17 +486,12 @@ export default function CascadeExplorerPage() {
     const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 0 | 1 | 2 | 3;
 
     const newGraphNode: ImpactNode = {
-        id: suggestedConsolidatedImpact.id,
-        label: suggestedConsolidatedImpact.label,
-        description: suggestedConsolidatedImpact.description,
-        validity: suggestedConsolidatedImpact.validity,
-        reasoning: suggestedConsolidatedImpact.reasoning,
-        parentId: suggestedConsolidatedImpact.parentId, // AI should propose this
-        keyConcepts: suggestedConsolidatedImpact.keyConcepts || [],
-        attributes: suggestedConsolidatedImpact.attributes || [],
-        causalReasoning: suggestedConsolidatedImpact.causalReasoning, 
+        ...suggestedConsolidatedImpact, // Spread all fields from AI's consolidatedImpact
         order: newConsolidatedImpactOrder, 
         nodeSystemType: 'GENERATED_IMPACT', 
+        // Ensure keyConcepts and attributes are arrays, even if AI omits them
+        keyConcepts: suggestedConsolidatedImpact.keyConcepts || [],
+        attributes: suggestedConsolidatedImpact.attributes || [],
         properties: { 
             keyConcepts: suggestedConsolidatedImpact.keyConcepts || [],
             attributes: suggestedConsolidatedImpact.attributes || [],
@@ -505,7 +501,6 @@ export default function CascadeExplorerPage() {
     const currentNodesSnapshot = allImpactNodesRef.current; 
     const currentLinksSnapshot = graphLinksRef.current;
 
-    // Calculate next state for nodes
     const nextNodes = currentNodesSnapshot
         .filter(n => !originalImpactIds.includes(n.id)) 
         .concat(newGraphNode); 
@@ -531,28 +526,24 @@ export default function CascadeExplorerPage() {
 
     finalNewLinks.push(...childLinksToReParent, ...parentLinksToReParent);
     
-    // Add parent link for the new consolidated node if it doesn't have one yet
     const hasParentLink = finalNewLinks.some(l => (typeof l.target === 'object' ? l.target.id : String(l.target)) === newGraphNode.id);
 
     if (!hasParentLink && newGraphNode.id !== CORE_ASSERTION_ID && newGraphNode.order > 0) {
         if (newGraphNode.parentId && nextNodes.some(n => n.id === newGraphNode.parentId && n.order === newGraphNode.order - 1)) {
-            // If AI provided a valid parentId that exists in the new node set
             finalNewLinks.push({ source: newGraphNode.parentId, target: newGraphNode.id });
         } else {
-            // Fallback: Link to any available node of the preceding order
             const potentialParents = nextNodes.filter(n => n.order === newGraphNode.order - 1 && n.id !== newGraphNode.id);
             if (potentialParents.length > 0) {
                 finalNewLinks.push({ source: potentialParents[0].id, target: newGraphNode.id });
                 console.warn(`Consolidated node ${newGraphNode.id} (Order ${newGraphNode.order}) linked to fallback parent ${potentialParents[0].id}.`);
             } else if (newGraphNode.order === 1 && nextNodes.some(n => n.id === CORE_ASSERTION_ID)) {
                  finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
-            } else if (nextNodes.some(n => n.id === CORE_ASSERTION_ID)) { // Last resort if no intermediate parents
+            } else if (nextNodes.some(n => n.id === CORE_ASSERTION_ID)) { 
                 finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
                 console.warn(`Consolidated node ${newGraphNode.id} (Order ${newGraphNode.order}) linked to CORE_ASSERTION as a last resort.`);
             }
         }
     }
-
 
     const uniqueLinks = new Map<string, ImpactLink>();
     finalNewLinks.forEach(link => {
@@ -611,15 +602,14 @@ export default function CascadeExplorerPage() {
   };
 
   const visibleNodes = useMemo(() => {
-    if (uiStep === ExplorerStep.INITIAL || uiStep === ExplorerStep.REFLECTION_PENDING) return [];
-    
-    const currentVisibleNodes = allImpactNodes; 
+    const currentNodes = allImpactNodes; 
 
+    if (uiStep === ExplorerStep.INITIAL || uiStep === ExplorerStep.REFLECTION_PENDING) return [];
     if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) {
-      return currentVisibleNodes.filter(n => n.order === 0);
+      return currentNodes.filter(n => n.order === 0);
     }
     
-    const maxVisibleOrder = {
+    const maxVisibleOrderMap: Partial<Record<ExplorerStep, number>> = {
         [ExplorerStep.ORDER_1_PENDING]: 0, 
         [ExplorerStep.ORDER_1_REVIEW]: 1,
         [ExplorerStep.ORDER_2_PENDING]: 1, 
@@ -629,13 +619,14 @@ export default function CascadeExplorerPage() {
         [ExplorerStep.CONSOLIDATION_PENDING]: 3, 
         [ExplorerStep.GENERATING_SUMMARY]: 3,
         [ExplorerStep.FINAL_REVIEW]: 3,
-    }[uiStep] ?? (currentVisibleNodes.length > 0 ? 3 : -1); 
+    };
+    
+    const maxVisibleOrder = maxVisibleOrderMap[uiStep] ?? (currentNodes.length > 0 ? 3 : -1);
 
-    if (maxVisibleOrder === -1 && currentVisibleNodes.length > 0 && reflectionResult) { 
-        return currentVisibleNodes.filter(n => n.order === 0);
+    if (maxVisibleOrder === -1 && currentNodes.length > 0 && reflectionResult) { 
+        return currentNodes.filter(n => n.order === 0);
     }
-
-    return currentVisibleNodes.filter(n => n.order <= maxVisibleOrder);
+    return currentNodes.filter(n => n.order <= maxVisibleOrder);
   }, [uiStep, reflectionResult, allImpactNodes]);
 
 
@@ -643,12 +634,19 @@ export default function CascadeExplorerPage() {
     if (!visibleNodes.length) return [];
     const currentLinksFromState = graphLinks; 
     const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
-    return currentLinksFromState.filter(link => {
+    const filteredLinks = currentLinksFromState.filter(link => {
       const sourceId = typeof link.source === 'object' ? link.source.id : String(link.source);
       const targetId = typeof link.target === 'object' ? link.target.id : String(link.target);
       return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
     });
+    // console.log('[DEBUG] visibleLinks calculated:', JSON.stringify(filteredLinks.map(l => ({s: l.source, t: l.target}))));
+    return filteredLinks;
   }, [visibleNodes, graphLinks]);
+
+  // Log visibleLinks whenever it changes, for debugging
+  // useEffect(() => {
+  //   console.log('[DEBUG] visibleLinks updated:', JSON.stringify(visibleLinks.map(l => ({s: l.source, t: l.target}))));
+  // }, [visibleLinks]);
 
   const renderStepContent = () => {
     const commonLoading = (text: string) => (
