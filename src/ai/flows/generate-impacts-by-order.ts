@@ -21,9 +21,9 @@ const GenerateImpactsByOrderInputSchema = z.object({
 });
 export type GenerateImpactsByOrderInput = z.infer<typeof GenerateImpactsByOrderInputSchema>;
 
-// Output schema now implicitly uses the updated ImpactSchema which includes structured keyConcepts and attributes
+// Output schema now implicitly uses the updated ImpactSchema which includes structured keyConcepts, attributes, and causalReasoning
 const GenerateImpactsByOrderOutputSchema = z.object({
-  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its structured `keyConcepts` (name, type) and `attributes`.'),
+  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its structured `keyConcepts` (name, type), `attributes`, and potentially `causalReasoning` explaining its link to the parent.'),
 });
 export type GenerateImpactsByOrderOutput = z.infer<typeof GenerateImpactsByOrderOutputSchema>;
 
@@ -40,7 +40,7 @@ The overall assertion we are exploring is: "{{assertionText}}"
 
 {{#if isTargetOrder1}}
 Based *only* on the assertion "{{assertionText}}", identify 3-5 distinct first-order impacts (immediate, direct effects).
-Do not generate second or third order impacts yet. For these first-order impacts, the 'parentId' field is not applicable.
+Do not generate second or third order impacts yet. For these first-order impacts, the 'parentId' and 'causalReasoning' fields are not applicable.
 {{/if}}
 
 {{#if isTargetOrder2}}
@@ -50,7 +50,9 @@ We have the following first-order impacts stemming from the assertion "{{asserti
 {{/each}}
 For each of these first-order parent impacts, identify 2-3 distinct second-order effects.
 Ensure the second-order effects are logical consequences of their specific parent impact and the overall assertion.
-For each second-order impact you generate, you MUST include a 'parentId' field in its data, set to the 'id' of the specific first-order parent impact it directly stems from.
+For each second-order impact you generate:
+  - You MUST include a 'parentId' field in its data, set to the 'id' of the specific first-order parent impact it directly stems from.
+  - You MUST include a 'causalReasoning' field, briefly explaining *why* this new impact is a direct consequence of its specified 'parentId' impact.
 Do not generate third order impacts yet.
 {{/if}}
 
@@ -61,7 +63,9 @@ We have the following second-order impacts, which ultimately stem from the asser
 {{/each}}
 For each of these second-order parent impacts, identify 1-2 distinct third-order societal shifts or long-term consequences.
 Ensure the third-order effects are logical consequences of their specific parent impact and the overall assertion.
-For each third-order impact you generate, you MUST include a 'parentId' field in its data, set to the 'id' of the specific second-order parent impact it directly stems from.
+For each third-order impact you generate:
+  - You MUST include a 'parentId' field in its data, set to the 'id' of the specific second-order parent impact it directly stems from.
+  - You MUST include a 'causalReasoning' field, briefly explaining *why* this new impact is a direct consequence of its specified 'parentId' impact.
 {{/if}}
 
 For each impact you generate:
@@ -72,10 +76,10 @@ For each impact you generate:
     - High: Strong precedent or already happening.
     - Medium: Plausible but uncertain timing/scale.
     - Low: Possible but requires many assumptions.
-- Provide reasoning for the validity assessment.
+- Provide reasoning for the validity assessment (this is different from causalReasoning).
 - Identify and list 2-4 key concepts or main nouns central to that specific impact. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). This list goes into a field named 'keyConcepts'.
 - Identify and list 1-2 key attributes or defining characteristics of that specific impact in a field named 'attributes'.
-- If generating for targetOrder 2 or 3, ensure the 'parentId' field is populated as described above.
+- If generating for targetOrder 2 or 3, ensure the 'parentId' and 'causalReasoning' fields are populated as described above.
 
 Return the generated impacts in the 'generatedImpacts' array.
 `,
@@ -107,3 +111,4 @@ const generateImpactsByOrderFlow = ai.defineFlow(
     return output!;
   }
 );
+

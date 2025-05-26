@@ -22,6 +22,7 @@ export const ImpactSchema = z.object({
   parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
   keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
+  causalReasoning: z.string().optional().describe('Explanation of why this impact is a consequence of its parent impact, if applicable (for 2nd/3rd order).'),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -65,13 +66,14 @@ export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOrigi
 export interface ImpactNode extends Impact, SimulationNodeDatum {
   order: 0 | 1 | 2 | 3; // 0 for core assertion
   nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT';
-  // Properties store data that might not be on ImpactSchema directly or is specific to UI/type (like fullAssertionText)
+  // Properties store data that might not be on ImpactSchema directly or is specific to UI/type (like fullAssertionText for core)
+  // keyConcepts and attributes are now directly on ImpactNode via extending Impact.
+  // CausalReasoning is also directly on ImpactNode.
   properties?: {
-    fullAssertionText?: string;
-    coreComponents?: string[];
-    // keyConcepts and attributes from Impact will also be often mirrored here for CORE_ASSERTION or if dynamically added
-    keyConcepts?: StructuredConcept[]; 
-    attributes?: string[];
+    fullAssertionText?: string; // Specific to CORE_ASSERTION
+    coreComponents?: string[]; // Specific to CORE_ASSERTION
+    // We can mirror keyConcepts/attributes here if we have other dynamic properties to add,
+    // but for display, accessing them directly from ImpactNode is now preferred.
     [key: string]: any; 
   };
   originalColor?: string;
@@ -109,3 +111,4 @@ export enum ExplorerStep {
   FINAL_REVIEW = 'final_review',
   CONSOLIDATION_PENDING = 'consolidation_pending',
 }
+

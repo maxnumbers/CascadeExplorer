@@ -49,11 +49,14 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
   // Access structured data directly from node or its properties
   const fullAssertionText = node.properties?.fullAssertionText || (node.nodeSystemType === 'CORE_ASSERTION' ? node.description : undefined);
   const coreComponents = node.properties?.coreComponents || [];
-  const keyConcepts: StructuredConcept[] = node.keyConcepts || node.properties?.keyConcepts || [];
-  const attributes: string[] = node.attributes || node.properties?.attributes || [];
+  
+  // KeyConcepts, attributes, causalReasoning are now directly on ImpactNode via extending ImpactSchema
+  const keyConcepts: StructuredConcept[] = node.keyConcepts || [];
+  const attributes: string[] = node.attributes || [];
+  const causalReasoning = node.causalReasoning;
   
   // Filter out known properties before displaying "Other Properties"
-  const knownPropertyKeys = ['fullAssertionText', 'coreComponents', 'keyConcepts', 'attributes'];
+  const knownPropertyKeys = ['fullAssertionText', 'coreComponents']; // keyConcepts, attributes, causalReasoning handled explicitly
   const otherProperties = Object.fromEntries(
     Object.entries(node.properties || {}).filter(([key]) => !knownPropertyKeys.includes(key))
   );
@@ -72,12 +75,20 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
               <Label htmlFor="description" className="font-semibold text-primary">Description</Label>
               <p id="description" className="text-sm text-muted-foreground whitespace-pre-wrap">{node.description}</p>
             </div>
-            <div className="space-y-1">
+
+            {causalReasoning && node.order > 0 && (
+                 <div className="space-y-1 border-t border-border pt-3 mt-3">
+                    <Label htmlFor="causalReasoning" className="font-semibold text-primary">Reasoning for Link to Parent</Label>
+                    <p id="causalReasoning" className="text-sm text-muted-foreground whitespace-pre-wrap">{causalReasoning}</p>
+                </div>
+            )}
+
+            <div className="space-y-1 border-t border-border pt-3 mt-3">
               <Label htmlFor="reasoning" className="font-semibold text-primary">Reasoning for Validity</Label>
               <p id="reasoning" className="text-sm text-muted-foreground whitespace-pre-wrap">{node.reasoning}</p>
             </div>
 
-            {node.nodeSystemType === 'CORE_ASSERTION' && fullAssertionText && (
+            {node.nodeSystemType === 'CORE_ASSERTION' && fullAssertionText && node.description !== fullAssertionText && (
                 <div className="space-y-1 border-t border-border pt-3 mt-3">
                     <Label className="font-semibold text-primary">Full Assertion Text</Label>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fullAssertionText}</p>
@@ -85,7 +96,7 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
             )}
             {node.nodeSystemType === 'CORE_ASSERTION' && coreComponents && coreComponents.length > 0 && (
                  <div className="space-y-1 border-t border-border pt-3 mt-3">
-                    <Label className="font-semibold text-primary">Core Components</Label>
+                    <Label className="font-semibold text-primary">Core Components (from Assertion)</Label>
                     <ul className="list-disc list-inside ml-4 text-sm text-muted-foreground">
                         {coreComponents.map((item, index) => <li key={`core-${index}`}>{item}</li>)}
                     </ul>
@@ -162,3 +173,4 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
     </Dialog>
   );
 }
+
