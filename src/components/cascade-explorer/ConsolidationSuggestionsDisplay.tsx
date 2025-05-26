@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, XCircle, Merge } from 'lucide-react';
+import { Merge, CheckCircle2, XCircle } from 'lucide-react'; // Removed AlertCircle as it was unused
 
 interface ConsolidationSuggestionsDisplayProps {
   suggestions: SuggestImpactConsolidationOutput | null;
@@ -35,7 +35,7 @@ export function ConsolidationSuggestionsDisplay({
     const originalLabels = suggestion.originalImpactIds.map(id => {
       const node = graphNodes.find(n => n.id === id);
       return node ? `"${node.label}"` : `ID: ${id}`;
-    }).slice(0, 2); // Show first two labels for brevity
+    }).slice(0, 2); 
 
     let labelText = `Consolidate: ${originalLabels.join(' & ')}`;
     if (suggestion.originalImpactIds.length > 2) {
@@ -53,6 +53,17 @@ export function ConsolidationSuggestionsDisplay({
       default: return 'secondary';
     }
   };
+
+  const getValidityBadgeVariant = (validity?: 'high' | 'medium' | 'low'): "default" | "secondary" | "destructive" | "outline" => {
+    if (!validity) return "outline";
+    switch (validity) {
+      case 'high': return 'default';
+      case 'medium': return 'secondary';
+      case 'low': return 'destructive';
+      default: return 'outline';
+    }
+  };
+
 
   return (
     <Card className="mt-6 shadow-xl bg-card text-card-foreground">
@@ -88,10 +99,19 @@ export function ConsolidationSuggestionsDisplay({
                       {suggestion.originalImpactIds.map(id => {
                         const originalNode = graphNodes.find(n => n.id === id);
                         return (
-                          <li key={id} className="p-3 border border-input rounded-md bg-card/50 shadow-sm">
-                            <p className="font-medium text-primary-foreground">Label: <span className="font-normal text-foreground">{originalNode?.label || id}</span></p>
-                            <p className="text-sm text-muted-foreground mt-1"><strong>Description:</strong> {originalNode?.description || 'N/A'}</p>
-                            <p className="text-sm mt-1"><strong>Current Validity:</strong> <Badge variant="outline" className="ml-1">{originalNode?.validity || 'N/A'}</Badge></p>
+                          <li key={id} className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
+                            <div>
+                                <strong className="text-primary">Label:</strong>
+                                <span className="ml-2 text-foreground">{originalNode?.label || id}</span>
+                            </div>
+                            <div>
+                                <strong className="text-primary">Description:</strong>
+                                <span className="ml-2 text-sm text-muted-foreground">{originalNode?.description || 'N/A'}</span>
+                            </div>
+                            <div>
+                                <strong className="text-primary">Current Validity:</strong> 
+                                <Badge variant={getValidityBadgeVariant(originalNode?.validity)} className="ml-1">{originalNode?.validity || 'N/A'}</Badge>
+                            </div>
                           </li>
                         );
                       })}
@@ -100,15 +120,19 @@ export function ConsolidationSuggestionsDisplay({
                   
                   <div className="border-t border-border my-4"></div>
 
-                  <div>
+                  <div className="space-y-1">
                     <h4 className="font-semibold text-accent mb-2">Proposed Consolidated Impact:</h4>
-                    <div className="p-3 border border-input rounded-md bg-card/50 shadow-sm">
-                        <p><strong className="text-sm text-primary-foreground">New Label:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.label}</span></p>
-                        <p className="mt-1"><strong className="text-sm text-primary-foreground">New Description:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.description}</span></p>
-                        <p className="mt-1">
-                        <strong className="text-sm text-primary-foreground">Proposed Validity:</strong> <Badge variant={getConfidenceVariant(suggestion.consolidatedImpact.validity)} className="ml-1">{suggestion.consolidatedImpact.validity}</Badge>
-                        <span className="text-xs text-muted-foreground ml-2">(Reasoning: {suggestion.consolidatedImpact.reasoning})</span>
-                        </p>
+                    <div className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
+                        <div>
+                            <strong className="text-sm text-primary">New Label:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.label}</span>
+                        </div>
+                        <div>
+                            <strong className="text-sm text-primary">New Description:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.description}</span>
+                        </div>
+                        <div>
+                            <strong className="text-sm text-primary">Proposed Validity:</strong> <Badge variant={getValidityBadgeVariant(suggestion.consolidatedImpact.validity)} className="ml-1">{suggestion.consolidatedImpact.validity}</Badge>
+                            <span className="text-xs text-muted-foreground ml-2">(Reasoning: {suggestion.consolidatedImpact.reasoning})</span>
+                        </div>
                     </div>
                   </div>
 
@@ -116,7 +140,7 @@ export function ConsolidationSuggestionsDisplay({
 
                   <div>
                     <h4 className="font-semibold text-accent mb-1">AI's Rationale:</h4>
-                    <p className="text-sm text-muted-foreground"><strong className="text-primary-foreground">Reason for Consolidation:</strong> {suggestion.reasoningForConsolidation}</p>
+                    <p className="text-sm text-muted-foreground"><strong className="text-primary">Reason for Consolidation:</strong> {suggestion.reasoningForConsolidation}</p>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 mt-6">
@@ -136,7 +160,6 @@ export function ConsolidationSuggestionsDisplay({
                       <XCircle className="mr-2 h-4 w-4" /> Dismiss
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground italic mt-3">Note: "Apply Consolidation" currently removes this suggestion from the list. Full graph merging is a future enhancement.</p>
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -145,7 +168,7 @@ export function ConsolidationSuggestionsDisplay({
       </CardContent>
       {suggestions.consolidationSuggestions.length > 0 && (
         <CardFooter>
-            <p className="text-xs text-muted-foreground">Review each suggestion carefully. Applying consolidations will eventually merge impacts in the graph.</p>
+            <p className="text-xs text-muted-foreground">Review each suggestion carefully. Applying consolidations will merge impacts in the graph.</p>
         </CardFooter>
       )}
     </Card>
