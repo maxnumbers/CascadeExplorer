@@ -1,6 +1,6 @@
 
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
-import { z } from 'zod';
+import { z } from 'zod'; // Changed from 'genkit' to 'zod'
 // Import ReflectAssertionOutput type from its flow file
 import type { ReflectAssertionOutput as AIReflectAssertionOutputOriginal } from '@/ai/flows/assertion-reflection';
 // Import SuggestImpactConsolidationOutput type from its flow file
@@ -15,6 +15,7 @@ export const ImpactSchema = z.object({
   description: z.string().describe('Detailed description of the impact.'),
   validity: z.enum(['high', 'medium', 'low']).describe('Validity assessment (high/medium/low).'),
   reasoning: z.string().describe('Reasoning for validity assessment.'),
+  parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -61,7 +62,7 @@ export const VALIDITY_OPTIONS: Array<{ value: 'high' | 'medium' | 'low'; label: 
 // Enum for UI steps to manage the flow
 export enum ExplorerStep {
   INITIAL = 'initial', // Before any assertion
-  REFLECTION_INPUT = 'reflection_input', // User entered assertion, awaiting reflection
+  REFLECTION_INPUT = 'reflection_input', // User entered assertion, awaiting reflection (not directly used as a step, more a sub-state of INITIAL)
   REFLECTION_PENDING = 'reflection_pending', // AI reflecting
   REFLECTION_REVIEW = 'reflection_review', // User reviewing AI reflection
   ORDER_1_PENDING = 'order_1_pending', // AI generating 1st order
@@ -73,3 +74,4 @@ export enum ExplorerStep {
   FINAL_REVIEW = 'final_review', // All orders generated, final review & consolidation
   CONSOLIDATION_PENDING = 'consolidation_pending', // AI suggesting consolidations
 }
+
