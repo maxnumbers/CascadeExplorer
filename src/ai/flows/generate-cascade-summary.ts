@@ -23,9 +23,9 @@ const summaryPrompt = ai.definePrompt({
   name: 'generateCascadeSummaryPrompt',
   input: {schema: CascadeSummaryInputSchema},
   output: {schema: CascadeSummaryOutputSchema},
-  prompt: `You are an AI assistant skilled in synthesizing complex information into a coherent narrative.
-You will receive a structured set of impacts, starting from an initial assertion and cascading through first, second, and third-order consequences.
-The impacts are linked by their order and 'parentId' fields where applicable. Each impact also includes its key concepts, attributes, and potentially causal reasoning explaining its link to its parent.
+  prompt: `You are an expert analyst and persuasive writer tasked with composing a compelling essay that explains the cascading consequences of an initial assertion.
+Your goal is to construct a powerful argument, drawing a clear and irrefutable line from the initial assertion to its ultimate, far-reaching consequences.
+You will receive a structured set of impacts: the initial assertion, and its first, second, and third-order consequences. Each impact includes its label, description, validity, key concepts, attributes, and (for 2nd/3rd order) causal reasoning linking it to its parent.
 
 Initial Assertion Summary: "{{initialAssertion.summary}}"
 Full Assertion Text: "{{initialAssertion.fullText}}"
@@ -66,17 +66,18 @@ Third-Order Impacts (Stemming from Second-Order Impacts):
   No third-order impacts were identified.
 {{/if}}
 
-Your task is to generate a "narrativeSummary". This summary should:
-1. Start by briefly restating or acknowledging the core of the initial assertion.
-2. Weave a story or logical chain explaining how the initial assertion leads to the first-order impacts, considering their descriptions, key concepts, and attributes.
-3. Continue this narrative by showing how key first-order impacts (or combinations thereof) give rise to the second-order impacts. Explicitly use the 'causalReasoning' provided for second-order impacts to explain these links, alongside their descriptions, concepts, and attributes.
-4. Extend the story to demonstrate how second-order impacts lead to the third-order consequences or societal shifts, again using 'causalReasoning' and other impact details.
-5. Highlight the most significant or plausible causal pathways through the network. If there are multiple distinct threads of consequence, try to cover them.
-6. Conclude with a cohesive statement that encapsulates the overall cascaded outcome or the primary set of conclusions derived from this exploration.
-7. The tone should be analytical and insightful, focusing on the logical flow of consequences.
-8. The summary should be a few paragraphs long, well-structured, and easy to understand.
+Your task is to generate a "narrativeSummary" in the form of a persuasive essay. This essay should:
+1.  **Introduction**: Begin by clearly stating the initial assertion and hinting at the profound cascade of consequences it unleashes. Establish the gravity or significance of this starting point.
+2.  **Body - Develop the Argument**:
+    *   Do NOT just list the impacts. Instead, synthesize them. Weave a compelling narrative that explains the *mechanisms* and *logical progression* by which one impact leads to another.
+    *   Make full use of the provided \`causalReasoning\`, \`keyConcepts\`, and \`attributes\` for each impact to add depth, credibility, and persuasive force to your analysis. Explain *how* and *why* these connections occur.
+    *   Trace the critical pathways through the network. If multiple impacts converge to create a more significant meta-impact or a feedback loop, articulate this convergence and its amplified effects.
+    *   Structure this section logically, perhaps by following key branches of the cascade or by thematic grouping of consequences.
+3.  **Conclusion**: End with a powerful concluding statement that summarizes the overall argument. Reiterate the most significant long-term outcomes and the inescapable logic of the cascade, leaving the reader with a strong understanding of the assertion's full implications.
+4.  **Tone and Style**: Maintain an analytical yet highly persuasive and articulate tone. Your language should be clear, precise, and impactful. Aim for a style that is both intellectually rigorous and compelling to read.
+5.  The essay should be well-structured, with clear paragraphs, and of a length appropriate to cover the complexity of the provided impact map (typically a few substantial paragraphs).
 
-Focus on creating a flowing narrative, not just a list of impacts. Identify the connections and explain the "how" and "why" of the cascade, using all the provided details for each impact.
+Focus on building an irrefutable case based on the provided data, demonstrating the chain of causality with clarity and persuasive insight.
 `,
 });
 
