@@ -46,20 +46,21 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
 
   const nodeTypeDisplay = node.nodeSystemType;
 
-  // Access structured data directly from node or its properties
+  // Access structured data directly from node properties or top-level fields
   const fullAssertionText = node.properties?.fullAssertionText || (node.nodeSystemType === 'CORE_ASSERTION' ? node.description : undefined);
   const coreComponents = node.properties?.coreComponents || [];
   
-  // KeyConcepts, attributes, causalReasoning are now directly on ImpactNode via extending ImpactSchema
-  const keyConcepts: StructuredConcept[] = node.keyConcepts || [];
-  const attributes: string[] = node.attributes || [];
+  const keyConcepts: StructuredConcept[] = node.keyConcepts || (node.properties?.keyConcepts as StructuredConcept[]) || [];
+  const attributes: string[] = node.attributes || (node.properties?.attributes as string[]) || [];
   const causalReasoning = node.causalReasoning;
   
-  // Filter out known properties before displaying "Other Properties"
-  const knownPropertyKeys = ['fullAssertionText', 'coreComponents']; // keyConcepts, attributes, causalReasoning handled explicitly
-  const otherProperties = Object.fromEntries(
-    Object.entries(node.properties || {}).filter(([key]) => !knownPropertyKeys.includes(key))
-  );
+  const explicitlyHandledPropertyKeys = ['fullAssertionText', 'coreComponents', 'keyConcepts', 'attributes'];
+  
+  const otherProperties = node.properties 
+    ? Object.fromEntries(
+        Object.entries(node.properties).filter(([key]) => !explicitlyHandledPropertyKeys.includes(key))
+      )
+    : {};
 
 
   return (
@@ -108,7 +109,7 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
                 <Label className="font-semibold text-primary">Key Concepts</Label>
                 <div className="flex flex-wrap gap-1">
                     {keyConcepts.map((item, index) => (
-                      <Badge key={`kc-${index}`} variant="secondary">
+                      <Badge key={`kc-${index}-${item.name}`} variant="secondary">
                         {item.name}
                         {item.type && <span className="ml-1 opacity-75">({item.type})</span>}
                       </Badge>
@@ -121,7 +122,7 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
               <div className="space-y-1 border-t border-border pt-3 mt-3">
                 <Label className="font-semibold text-primary">Attributes</Label>
                  <div className="flex flex-wrap gap-1">
-                    {attributes.map((item, index) => <Badge key={`attr-${index}`} variant="outline">{item}</Badge>)}
+                    {attributes.map((item, index) => <Badge key={`attr-${index}-${item}`} variant="outline">{item}</Badge>)}
                 </div>
               </div>
             )}
@@ -173,4 +174,3 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
     </Dialog>
   );
 }
-
