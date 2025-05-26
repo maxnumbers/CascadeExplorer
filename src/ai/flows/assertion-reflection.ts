@@ -1,3 +1,4 @@
+
 // This file is machine-generated - edit at your own risk.
 
 'use server';
@@ -22,7 +23,7 @@ export type ReflectAssertionInput = z.infer<typeof ReflectAssertionInputSchema>;
 
 const ReflectAssertionOutputSchema = z.object({
   reflection: z.string().describe('The AI-generated reflection of the user assertion.'),
-  summary: z.string().describe('A short summary of the assertion.'),
+  summary: z.string().describe('A very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.'),
   coreComponents: z.array(z.string()).describe('Key elements of the assertion.'),
   confirmationQuestion: z.string().describe('A question to confirm understanding with the user.'),
 });
@@ -40,9 +41,10 @@ const reflectAssertionPrompt = ai.definePrompt({
 
 You will receive an assertion from the user. Your task is to:
 
-1.  Summarize the assertion in 1-2 clear sentences (reflection).
-2.  Identify the core components of the assertion (usually 2-3 main parts).
-3.  Generate a question to confirm your understanding with the user.
+1.  Create a concise summary of the assertion, ideally 5-10 words, suitable as a short title (for the 'summary' field).
+2.  Provide a more detailed reflection of the assertion in 1-2 clear sentences (for the 'reflection' field).
+3.  Identify the core components of the assertion (usually 2-3 main parts).
+4.  Generate a question to confirm your understanding with the user.
 
 Here is the assertion:
 
@@ -61,3 +63,4 @@ const reflectAssertionFlow = ai.defineFlow(
     return output!;
   }
 );
+
