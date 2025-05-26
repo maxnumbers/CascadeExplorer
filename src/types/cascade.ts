@@ -17,6 +17,7 @@ export const ImpactSchema = z.object({
   reasoning: z.string().describe('Reasoning for validity assessment.'),
   parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
   keyConcepts: z.array(z.string()).optional().describe('A list of key concepts, entities, or main nouns mentioned in this specific impact.'),
+  attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -25,7 +26,7 @@ export const ImpactMappingInputForConsolidationSchema = z.object({
   secondOrder: z.array(ImpactSchema).describe('Downstream effects.'),
   thirdOrder: z.array(ImpactSchema).describe('Societal shifts.'),
 });
-export type ImpactMappingInputForConsolidation = z.infer<typeof ImpactMappingInputForConsolidationSchema>;
+export type ImpactMappingInputForConsolidation = ImpactMappingInputForConsolidationSchema;
 
 // Schema for the input of the cascade summary generation AI flow
 export const CascadeSummaryInputSchema = z.object({
