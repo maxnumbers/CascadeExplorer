@@ -22,7 +22,7 @@ const GenerateImpactsByOrderInputSchema = z.object({
 export type GenerateImpactsByOrderInput = z.infer<typeof GenerateImpactsByOrderInputSchema>;
 
 const GenerateImpactsByOrderOutputSchema = z.object({
-  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`.'),
+  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its `keyConcepts`.'),
 });
 export type GenerateImpactsByOrderOutput = z.infer<typeof GenerateImpactsByOrderOutputSchema>;
 
@@ -72,6 +72,7 @@ For each impact you generate:
     - Medium: Plausible but uncertain timing/scale.
     - Low: Possible but requires many assumptions.
 - Provide reasoning for the validity assessment.
+- For each impact, identify and list 2-4 key concepts or main nouns central to that specific impact in a field named 'keyConcepts'.
 - If generating for targetOrder 2 or 3, ensure the 'parentId' field is populated as described above.
 
 Return the generated impacts in the 'generatedImpacts' array.
@@ -105,4 +106,3 @@ const generateImpactsByOrderFlow = ai.defineFlow(
     return output!;
   }
 );
-

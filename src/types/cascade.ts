@@ -16,6 +16,7 @@ export const ImpactSchema = z.object({
   validity: z.enum(['high', 'medium', 'low']).describe('Validity assessment (high/medium/low).'),
   reasoning: z.string().describe('Reasoning for validity assessment.'),
   parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
+  keyConcepts: z.array(z.string()).optional().describe('A list of key concepts, entities, or main nouns mentioned in this specific impact.'),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
