@@ -25,7 +25,7 @@ const summaryPrompt = ai.definePrompt({
   output: {schema: CascadeSummaryOutputSchema},
   prompt: `You are an AI assistant skilled in synthesizing complex information into a coherent narrative.
 You will receive a structured set of impacts, starting from an initial assertion and cascading through first, second, and third-order consequences.
-The impacts are linked by their order and 'parentId' fields where applicable.
+The impacts are linked by their order and 'parentId' fields where applicable. Each impact also includes its key concepts, attributes, and potentially causal reasoning explaining its link to its parent.
 
 Initial Assertion Summary: "{{initialAssertion.summary}}"
 Full Assertion Text: "{{initialAssertion.fullText}}"
@@ -34,6 +34,9 @@ First-Order Impacts (Direct Consequences of the Assertion):
 {{#if firstOrderImpacts.length}}
   {{#each firstOrderImpacts}}
   - ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
+    {{#if keyConcepts.length}}Key Concepts: {{#each keyConcepts}}{{name}}{{#if type}} ({{type}}){{/if}}{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
+    {{#if attributes.length}}Attributes: {{#each attributes}}"{{this}}"{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
+    {{#if causalReasoning}}Causal Reasoning (from parent): "{{causalReasoning}}"{{/if}}
   {{/each}}
 {{else}}
   No first-order impacts were identified for this assertion.
@@ -43,6 +46,9 @@ Second-Order Impacts (Stemming from First-Order Impacts):
 {{#if secondOrderImpacts.length}}
   {{#each secondOrderImpacts}}
   - ID: {{id}}, ParentID (1st order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
+    {{#if keyConcepts.length}}Key Concepts: {{#each keyConcepts}}{{name}}{{#if type}} ({{type}}){{/if}}{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
+    {{#if attributes.length}}Attributes: {{#each attributes}}"{{this}}"{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
+    {{#if causalReasoning}}Causal Reasoning (from parent): "{{causalReasoning}}"{{/if}}
   {{/each}}
 {{else}}
   No second-order impacts were identified.
@@ -52,6 +58,9 @@ Third-Order Impacts (Stemming from Second-Order Impacts):
 {{#if thirdOrderImpacts.length}}
   {{#each thirdOrderImpacts}}
   - ID: {{id}}, ParentID (2nd order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
+    {{#if keyConcepts.length}}Key Concepts: {{#each keyConcepts}}{{name}}{{#if type}} ({{type}}){{/if}}{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
+    {{#if attributes.length}}Attributes: {{#each attributes}}"{{this}}"{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
+    {{#if causalReasoning}}Causal Reasoning (from parent): "{{causalReasoning}}"{{/if}}
   {{/each}}
 {{else}}
   No third-order impacts were identified.
@@ -59,15 +68,15 @@ Third-Order Impacts (Stemming from Second-Order Impacts):
 
 Your task is to generate a "narrativeSummary". This summary should:
 1. Start by briefly restating or acknowledging the core of the initial assertion.
-2. Weave a story or logical chain explaining how the initial assertion leads to the first-order impacts.
-3. Continue this narrative by showing how key first-order impacts (or combinations thereof) give rise to the second-order impacts.
-4. Extend the story to demonstrate how second-order impacts lead to the third-order consequences or societal shifts.
+2. Weave a story or logical chain explaining how the initial assertion leads to the first-order impacts, considering their descriptions, key concepts, and attributes.
+3. Continue this narrative by showing how key first-order impacts (or combinations thereof) give rise to the second-order impacts. Explicitly use the 'causalReasoning' provided for second-order impacts to explain these links, alongside their descriptions, concepts, and attributes.
+4. Extend the story to demonstrate how second-order impacts lead to the third-order consequences or societal shifts, again using 'causalReasoning' and other impact details.
 5. Highlight the most significant or plausible causal pathways through the network. If there are multiple distinct threads of consequence, try to cover them.
 6. Conclude with a cohesive statement that encapsulates the overall cascaded outcome or the primary set of conclusions derived from this exploration.
 7. The tone should be analytical and insightful, focusing on the logical flow of consequences.
 8. The summary should be a few paragraphs long, well-structured, and easy to understand.
 
-Focus on creating a flowing narrative, not just a list of impacts. Identify the connections and explain the "how" and "why" of the cascade.
+Focus on creating a flowing narrative, not just a list of impacts. Identify the connections and explain the "how" and "why" of the cascade, using all the provided details for each impact.
 `,
 });
 
@@ -97,3 +106,4 @@ const generateCascadeSummaryFlow = ai.defineFlow(
     return output;
   }
 );
+
