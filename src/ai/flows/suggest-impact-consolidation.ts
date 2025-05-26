@@ -13,7 +13,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 // Import schemas and types from the shared types file
-import { ImpactSchema, ImpactMappingInputForConsolidationSchema as SuggestImpactConsolidationInputSchema } from '@/types/cascade';
+import { ImpactSchema, ImpactMappingInputForConsolidationSchema as SuggestImpactConsolidationInputSchema, StructuredConceptSchema } from '@/types/cascade';
 import type { ImpactMappingInputForConsolidation as SuggestImpactConsolidationInputType } from '@/types/cascade';
 
 
@@ -24,8 +24,8 @@ const ConsolidatedImpactSuggestionSchema = z.object({
   consolidatedImpact: ImpactSchema.extend({
     id: z.string().describe("A proposed unique ID for the new consolidated impact (e.g., consolidated-1st-impact-1)."),
     order: z.enum(['1', '2', '3']).describe("The hierarchical order (1st, 2nd, or 3rd) this consolidated impact belongs to. This MUST be the same as the order of the originalImpactIds."),
-    // keyConcepts and attributes are already part of ImpactSchema and should be synthesized by the AI
-  }).describe("The suggested new consolidated impact, synthesizing the originals. Its order must match the order of the original impacts. It should include synthesized keyConcepts and attributes."),
+    // keyConcepts and attributes are now part of ImpactSchema and should be synthesized by the AI
+  }).describe("The suggested new consolidated impact, synthesizing the originals. Its order must match the order of the original impacts. It should include synthesized structured keyConcepts (name, type) and attributes."),
   confidence: z.enum(['high', 'medium', 'low']).describe("Confidence in this consolidation suggestion (high, medium, low)."),
   reasoningForConsolidation: z.string().describe("Explanation why these impacts (within the same order) can be consolidated.")
 });
@@ -48,21 +48,21 @@ const consolidationPrompt = ai.definePrompt({
   prompt: `You are an AI assistant skilled in identifying conceptual overlaps and redundancies in a structured list of impacts.
 Your goal is to help simplify an impact map by suggesting consolidations of impacts that are truly similar or represent different expressions of the same core idea *within their specific hierarchical order*.
 
-Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion. Each impact may have associated key concepts and attributes:
+Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion. Each impact may have associated structured key concepts (name, type) and attributes:
 
 First-Order Impacts:
 {{#each firstOrder}}
-- ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+- ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}{name: "{{name}}"{{#if type}}, type: "{{type}}"{{/if}}{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
 {{/each}}
 
 Second-Order Impacts:
 {{#each secondOrder}}
-- ID: {{id}}, ParentID (from 1st order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+- ID: {{id}}, ParentID (from 1st order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}{name: "{{name}}"{{#if type}}, type: "{{type}}"{{/if}}{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
 {{/each}}
 
 Third-Order Impacts:
 {{#each thirdOrder}}
-- ID: {{id}}, ParentID (from 2nd order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+- ID: {{id}}, ParentID (from 2nd order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}{name: "{{name}}"{{#if type}}, type: "{{type}}"{{/if}}{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
 {{/each}}
 
 Your task is to:
@@ -81,13 +81,13 @@ Your task is to:
         iv. \`validity\`: An estimated validity ('high', 'medium', 'low') for the consolidated impact, carefully considered based on the validities of the original impacts.
         v. \`reasoning\`: A brief explanation for the consolidated impact's validity assessment.
         vi. \`parentId\`: If ALL original impacts share the SAME parentId (from the preceding order), then use that parentId. If they have DIFFERENT parentIds, or if it's a 1st order consolidation (no parentId applicable), then OMIT the parentId field for the consolidatedImpact or set it to null/undefined. The application will handle linking it appropriately based on its order.
-        vii. \`keyConcepts\`: Synthesize a new list of key concepts (2-4) for the consolidated impact, drawing from the original impacts' key concepts.
+        vii. \`keyConcepts\`: Synthesize a new list of structured key concepts (2-4, each as an object with 'name' and optional 'type') for the consolidated impact, drawing from the original impacts' key concepts.
         viii. \`attributes\`: Synthesize a new list of attributes (1-2) for the consolidated impact, drawing from the original impacts' attributes.
     c. \`confidence\`: Your confidence ('high', 'medium', 'low') that this consolidation is appropriate and meaningful.
     d. \`reasoningForConsolidation\`: A brief explanation of why these specific impacts (from the same order) can be consolidated, highlighting the shared theme or redundancy.
 5.  If no such groups are found within any order, return an empty list for \`consolidationSuggestions\`.
 
-Focus on strong semantic similarity and thematic convergence within each order. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order. The synthesized keyConcepts and attributes for the consolidated impact are crucial.
+Focus on strong semantic similarity and thematic convergence within each order. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order. The synthesized structured keyConcepts (name, type) and attributes for the consolidated impact are crucial.
 `,
 });
 

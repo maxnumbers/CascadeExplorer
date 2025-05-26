@@ -12,7 +12,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { ImpactSchema } from '@/types/cascade'; 
+import { ImpactSchema, StructuredConceptSchema } from '@/types/cascade'; 
 
 const GenerateImpactsByOrderInputSchema = z.object({
   assertionText: z.string().describe('The initial user assertion or idea for overall context.'),
@@ -21,8 +21,9 @@ const GenerateImpactsByOrderInputSchema = z.object({
 });
 export type GenerateImpactsByOrderInput = z.infer<typeof GenerateImpactsByOrderInputSchema>;
 
+// Output schema now implicitly uses the updated ImpactSchema which includes structured keyConcepts and attributes
 const GenerateImpactsByOrderOutputSchema = z.object({
-  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its `keyConcepts` and `attributes`.'),
+  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its structured `keyConcepts` (name, type) and `attributes`.'),
 });
 export type GenerateImpactsByOrderOutput = z.infer<typeof GenerateImpactsByOrderOutputSchema>;
 
@@ -72,7 +73,7 @@ For each impact you generate:
     - Medium: Plausible but uncertain timing/scale.
     - Low: Possible but requires many assumptions.
 - Provide reasoning for the validity assessment.
-- Identify and list 2-4 key concepts or main nouns central to that specific impact in a field named 'keyConcepts'.
+- Identify and list 2-4 key concepts or main nouns central to that specific impact. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). This list goes into a field named 'keyConcepts'.
 - Identify and list 1-2 key attributes or defining characteristics of that specific impact in a field named 'attributes'.
 - If generating for targetOrder 2 or 3, ensure the 'parentId' field is populated as described above.
 
@@ -89,7 +90,6 @@ const generateImpactsByOrderFlow = ai.defineFlow(
   async (input) => {
     if ((input.targetOrder === '2' || input.targetOrder === '3') && (!input.parentImpacts || input.parentImpacts.length === 0)) {
       // This condition is primarily handled on the client-side before calling the flow.
-      // Consider returning an empty array or specific error if this is an invalid state for the AI.
     }
 
     const isTargetOrder1 = input.targetOrder === '1';

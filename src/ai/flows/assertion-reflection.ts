@@ -13,6 +13,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { StructuredConceptSchema } from '@/types/cascade';
 
 const ReflectAssertionInputSchema = z.object({
   assertion: z
@@ -25,7 +26,7 @@ const ReflectAssertionOutputSchema = z.object({
   reflection: z.string().describe('The AI-generated reflection of the user assertion.'),
   summary: z.string().describe('A very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.'),
   coreComponents: z.array(z.string()).describe('Key elements of the assertion.'),
-  keyConcepts: z.array(z.string()).describe('A list of key concepts, entities, or main nouns mentioned in the assertion.'),
+  keyConcepts: z.array(StructuredConceptSchema).describe("A list of key concepts or entities (each as an object with a 'name' and an optional 'type' like 'Technology', 'Person', 'Organization') mentioned in the assertion."),
   confirmationQuestion: z.string().describe('A question to confirm understanding with the user.'),
 });
 export type ReflectAssertionOutput = z.infer<typeof ReflectAssertionOutputSchema>;
@@ -45,7 +46,7 @@ You will receive an assertion from the user. Your task is to:
 1.  Create a concise summary of the assertion, ideally 5-10 words, suitable as a short title (for the 'summary' field).
 2.  Provide a more detailed reflection of the assertion in 1-2 clear sentences (for the 'reflection' field).
 3.  Identify the core components of the assertion (usually 2-3 main parts).
-4.  Identify a list of key concepts, entities, or main nouns mentioned in the assertion (for the 'keyConcepts' field).
+4.  Identify a list of key concepts or entities mentioned in the assertion. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). This list goes into the 'keyConcepts' field.
 5.  Generate a question to confirm your understanding with the user.
 
 Here is the assertion:
@@ -65,4 +66,3 @@ const reflectAssertionFlow = ai.defineFlow(
     return output!;
   }
 );
-

@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { ImpactNode } from '@/types/cascade';
+import type { ImpactNode, StructuredConcept } from '@/types/cascade';
 import { VALIDITY_OPTIONS } from '@/types/cascade';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,12 +44,20 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
     3: "Third-Order Impact",
   };
 
-  const nodeTypeDisplay = node.nodeSystemType === 'CORE_ASSERTION' ? 'Core Assertion' :
-                          node.nodeSystemType === 'GENERATED_IMPACT' ? 'Generated Impact' :
-                          node.nodeSystemType;
+  const nodeTypeDisplay = node.nodeSystemType;
 
-  // Explicitly extract known properties for structured display
-  const { fullAssertionText, coreComponents, keyConcepts, attributes, ...otherProperties } = node.properties || {};
+  // Access structured data directly from node or its properties
+  const fullAssertionText = node.properties?.fullAssertionText || (node.nodeSystemType === 'CORE_ASSERTION' ? node.description : undefined);
+  const coreComponents = node.properties?.coreComponents || [];
+  const keyConcepts: StructuredConcept[] = node.keyConcepts || node.properties?.keyConcepts || [];
+  const attributes: string[] = node.attributes || node.properties?.attributes || [];
+  
+  // Filter out known properties before displaying "Other Properties"
+  const knownPropertyKeys = ['fullAssertionText', 'coreComponents', 'keyConcepts', 'attributes'];
+  const otherProperties = Object.fromEntries(
+    Object.entries(node.properties || {}).filter(([key]) => !knownPropertyKeys.includes(key))
+  );
+
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -88,7 +96,12 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity }: Nod
               <div className="space-y-1 border-t border-border pt-3 mt-3">
                 <Label className="font-semibold text-primary">Key Concepts</Label>
                 <div className="flex flex-wrap gap-1">
-                    {keyConcepts.map((item, index) => <Badge key={`kc-${index}`} variant="secondary">{item}</Badge>)}
+                    {keyConcepts.map((item, index) => (
+                      <Badge key={`kc-${index}`} variant="secondary">
+                        {item.name}
+                        {item.type && <span className="ml-1 opacity-75">({item.type})</span>}
+                      </Badge>
+                    ))}
                 </div>
               </div>
             )}

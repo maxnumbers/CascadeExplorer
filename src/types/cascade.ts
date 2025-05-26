@@ -3,11 +3,15 @@ import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
 import { z } from 'zod';
 // Import ReflectAssertionOutput type from its flow file
 import type { ReflectAssertionOutput as AIReflectAssertionOutputOriginal } from '@/ai/flows/assertion-reflection';
-// Import SuggestImpactConsolidationOutput type from its flow file
-// import type { SuggestImpactConsolidationOutput as AISuggestImpactConsolidationOutputOriginal } from '@/ai/flows/suggest-impact-consolidation';
 // Import types for the new generateImpactsByOrder flow
 import type { GenerateImpactsByOrderInput as AIGenerateImpactsByOrderInputOriginal, GenerateImpactsByOrderOutput as AIGenerateImpactsByOrderOutputOriginal } from '@/ai/flows/generate-impacts-by-order';
 
+
+export const StructuredConceptSchema = z.object({
+  name: z.string().describe("The name of the key concept or entity."),
+  type: z.string().optional().describe("An optional type for the concept (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person').")
+});
+export type StructuredConcept = z.infer<typeof StructuredConceptSchema>;
 
 export const ImpactSchema = z.object({
   id: z.string().describe('Unique identifier for the impact.'),
@@ -16,10 +20,8 @@ export const ImpactSchema = z.object({
   validity: z.enum(['high', 'medium', 'low']).describe('Validity assessment (high/medium/low).'),
   reasoning: z.string().describe('Reasoning for validity assessment.'),
   parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
-  keyConcepts: z.array(z.string()).optional().describe('A list of key concepts, entities, or main nouns mentioned in this specific impact.'),
+  keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
-  // order field is NOT part of the base ImpactSchema as AI generates it per-request context
-  // but it's essential for ImpactNode and for consolidated impacts.
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -52,8 +54,10 @@ export type CascadeSummaryOutput = z.infer<typeof CascadeSummaryOutputSchema>;
 
 
 // Re-export AI types for easier access if needed elsewhere
-export type AIReflectAssertionOutput = AIReflectAssertionOutputOriginal;
-// export type AISuggestImpactConsolidationOutput = AISuggestImpactConsolidationOutputOriginal; // This will be defined in its own flow file
+export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'keyConcepts'> & {
+  keyConcepts: StructuredConcept[];
+};
+
 export type AIGenerateImpactsByOrderInput = AIGenerateImpactsByOrderInputOriginal;
 export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOriginal;
 
@@ -61,12 +65,14 @@ export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOrigi
 export interface ImpactNode extends Impact, SimulationNodeDatum {
   order: 0 | 1 | 2 | 3; // 0 for core assertion
   nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT';
+  // Properties store data that might not be on ImpactSchema directly or is specific to UI/type (like fullAssertionText)
   properties?: {
     fullAssertionText?: string;
     coreComponents?: string[];
-    keyConcepts?: string[]; // For core assertion and potentially merged from generated impacts
-    attributes?: string[]; // For generated impacts and potentially merged
-    [key: string]: any; // Allows other dynamic properties
+    // keyConcepts and attributes from Impact will also be often mirrored here for CORE_ASSERTION or if dynamically added
+    keyConcepts?: StructuredConcept[]; 
+    attributes?: string[];
+    [key: string]: any; 
   };
   originalColor?: string;
 }
@@ -74,7 +80,6 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
 export interface ImpactLink extends SimulationLinkDatum<ImpactNode> {
   source: string | ImpactNode;
   target: string | ImpactNode;
-  // type?: 'causal' | 'influences' | 'consolidates'; // Future for richer relationships
 }
 
 export const NODE_COLORS: Record<number, string> = {
@@ -90,7 +95,6 @@ export const VALIDITY_OPTIONS: Array<{ value: 'high' | 'medium' | 'low'; label: 
   { value: 'low', label: 'Low Validity' },
 ];
 
-// Enum for UI steps to manage the flow
 export enum ExplorerStep {
   INITIAL = 'initial',
   REFLECTION_PENDING = 'reflection_pending',
