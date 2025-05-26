@@ -20,7 +20,7 @@ import type { ImpactMappingInputForConsolidation as SuggestImpactConsolidationIn
 export type SuggestImpactConsolidationInput = SuggestImpactConsolidationInputType;
 
 const ConsolidatedImpactSuggestionSchema = z.object({
-  originalImpactIds: z.array(z.string()).describe("IDs of the impacts (all from the same order) suggested for consolidation."),
+  originalImpactIds: z.array(z.string()).describe("IDs of the impacts (all from the same order) suggested for consolidation. This field is MANDATORY."),
   consolidatedImpact: ImpactSchema.extend({
     id: z.string().describe("A proposed unique ID for the new consolidated impact (e.g., consolidated-1st-impact-1)."),
     order: z.enum(['1', '2', '3']).describe("The hierarchical order (1st, 2nd, or 3rd) this consolidated impact belongs to. This MUST be the same as the order of the originalImpactIds."),
@@ -48,7 +48,7 @@ const consolidationPrompt = ai.definePrompt({
   prompt: `You are an AI assistant skilled in identifying conceptual overlaps and redundancies in a structured list of impacts.
 Your goal is to help simplify an impact map by suggesting consolidations of impacts that are truly similar or represent different expressions of the same core idea *within their specific hierarchical order*.
 
-Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion. Each impact may have associated structured key concepts (name, type) and attributes:
+Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion. Each impact has associated structured key concepts (name, type) and attributes:
 
 First-Order Impacts:
 {{#each firstOrder}}
@@ -71,8 +71,8 @@ Your task is to:
     a. Highly similar or redundant in their meaning.
     b. Represent different facets or perspectives of the *same fundamental underlying consequence or theme* appropriate to that order. These impacts might appear to stem from different parent impacts in the *preceding order* (e.g., two 2nd-order impacts having different 1st-order parentIds), but if they converge on a shared theme at their *current order*, they are candidates for consolidation.
 3.  Critically, do NOT suggest consolidating impacts from different orders with each other (e.g., do not merge a 1st order impact with a 2nd order impact).
-4.  For each identified group, provide:
-    a. \`originalImpactIds\`: A list of the IDs of the original impacts you suggest consolidating. All these IDs must belong to the same order.
+4.  For each identified group, you MUST provide:
+    a. \`originalImpactIds\`: A list of the IDs of the original impacts you suggest consolidating. All these IDs must belong to the same order. THIS FIELD IS MANDATORY AND MUST ALWAYS BE PRESENT.
     b. \`consolidatedImpact\`: A new, single impact object. This object MUST include an \`order\` field (e.g., '1', '2', or '3') that is the SAME as the order of the \`originalImpactIds\` being consolidated.
         The \`consolidatedImpact\` should also have:
         i. \`id\`: Propose a new, unique ID (e.g., 'consolidated-1st-impact-1').
@@ -88,6 +88,7 @@ Your task is to:
 5.  If no such groups are found within any order, return an empty list for \`consolidationSuggestions\`.
 
 Focus on strong semantic similarity and thematic convergence within each order. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order. The synthesized structured keyConcepts (name, type) and attributes for the consolidated impact are crucial.
+MAKE ABSOLUTELY SURE THAT EACH SUGGESTION OBJECT IN THE 'consolidationSuggestions' ARRAY CONTAINS THE 'originalImpactIds' FIELD.
 `,
 });
 
@@ -117,6 +118,9 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
     const canConsolidateThird = promptInput.thirdOrder.length >= 2;
 
     if (!canConsolidateFirst && !canConsolidateSecond && !canConsolidateThird) {
+        // If no individual order has enough impacts to consolidate, don't call the AI.
+        // This complements the client-side check in page.tsx, but for cases where
+        // individual orders might be sparse even if the total number of impacts is high.
         return { consolidationSuggestions: [] };
     }
 
@@ -124,3 +128,4 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
     return output!;
   }
 );
+
