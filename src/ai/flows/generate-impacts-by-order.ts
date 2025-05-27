@@ -11,7 +11,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod'; // Changed from 'genkit' to 'zod' for direct use
 import { ImpactSchema, StructuredConceptSchema } from '@/types/cascade'; 
 
 const GenerateImpactsByOrderInputSchema = z.object({
@@ -22,7 +22,7 @@ const GenerateImpactsByOrderInputSchema = z.object({
 export type GenerateImpactsByOrderInput = z.infer<typeof GenerateImpactsByOrderInputSchema>;
 
 const GenerateImpactsByOrderOutputSchema = z.object({
-  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact for order 2 or 3 should include a `parentId` field if it directly stems from one of the input `parentImpacts`. Each impact should also include a list of its structured `keyConcepts` (name, type), `attributes`, and potentially `causalReasoning` explaining its link to the parent.'),
+  generatedImpacts: z.array(ImpactSchema).describe('An array of impacts generated for the target order. Each impact should include a list of its structured `keyConcepts` (name, type), `attributes`, and `causalReasoning` explaining its plausibility given the preceding impacts.'),
 });
 export type GenerateImpactsByOrderOutput = z.infer<typeof GenerateImpactsByOrderOutputSchema>;
 
@@ -34,13 +34,13 @@ const prompt = ai.definePrompt({
   name: 'generateImpactsByOrderPrompt',
   input: {schema: GenerateImpactsByOrderInputSchema}, 
   output: {schema: GenerateImpactsByOrderOutputSchema},
-  prompt: `You are a Cascade Thinking System. Your goal is to identify cascading impacts.
+  prompt: `You are a Cascade Thinking System. Your goal is to identify cascading impacts in a distinct and varied manner.
 The overall assertion we are exploring is: "{{assertionText}}"
 
 {{#if isTargetOrder1}}
 Based *only* on the assertion "{{assertionText}}", identify 3-5 distinct and varied first-order impacts (immediate, direct effects).
 Ensure each impact represents a unique consequence, avoiding repetition.
-Do not generate second or third order impacts yet. For these first-order impacts, the 'parentId' and 'causalReasoning' fields are not applicable.
+Do not generate second or third order impacts yet. For these first-order impacts, the 'causalReasoning' field should explain their direct link to the assertion.
 {{/if}}
 
 {{#if isTargetOrder2}}
@@ -50,9 +50,7 @@ We have the following first-order impacts stemming from the assertion "{{asserti
 {{/each}}
 For each of these first-order parent impacts, identify 2-3 distinct and varied second-order effects.
 Ensure each effect is a unique consequence of its specific parent impact and the overall assertion, avoiding repetition of ideas already covered.
-For each second-order impact you generate:
-  - You MUST include a 'parentId' field in its data, set to the 'id' of the specific first-order parent impact it directly stems from.
-  - You MUST include a 'causalReasoning' field, briefly explaining *why* this new impact is a direct consequence of its specified 'parentId' impact.
+For each second-order impact you generate, include a 'causalReasoning' field, briefly explaining *why* this new impact is a plausible consequence of the preceding first-order impacts and the overall assertion.
 Do not generate third order impacts yet.
 {{/if}}
 
@@ -63,9 +61,7 @@ We have the following second-order impacts, which ultimately stem from the asser
 {{/each}}
 For each of these second-order parent impacts, identify 1-2 distinct and varied third-order societal shifts or long-term consequences.
 Ensure each consequence is a unique outcome of its specific parent impact and the overall assertion, avoiding repetition.
-For each third-order impact you generate:
-  - You MUST include a 'parentId' field in its data, set to the 'id' of the specific second-order parent impact it directly stems from.
-  - You MUST include a 'causalReasoning' field, briefly explaining *why* this new impact is a direct consequence of its specified 'parentId' impact.
+For each third-order impact you generate, include a 'causalReasoning' field, briefly explaining *why* this new impact is a plausible consequence of the preceding second-order impacts and the overall assertion.
 {{/if}}
 
 For each impact you generate:
@@ -79,7 +75,7 @@ For each impact you generate:
 - Provide reasoning for the validity assessment (this is different from causalReasoning).
 - Identify and list 2-4 key concepts or main nouns central to that specific impact. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). This list goes into a field named 'keyConcepts'.
 - Identify and list 1-2 key attributes or defining characteristics of that specific impact in a field named 'attributes'.
-- If generating for targetOrder 2 or 3, ensure the 'parentId' and 'causalReasoning' fields are populated as described above.
+- The 'causalReasoning' field should explain the impact's plausibility in the context of the overall assertion and its preceding impacts.
 
 Return the generated impacts in the 'generatedImpacts' array.
 `,
@@ -94,6 +90,9 @@ const generateImpactsByOrderFlow = ai.defineFlow(
   async (input) => {
     if ((input.targetOrder === '2' || input.targetOrder === '3') && (!input.parentImpacts || input.parentImpacts.length === 0)) {
       // This condition is primarily handled on the client-side before calling the flow.
+      // However, returning an empty list is safe if it's called unexpectedly.
+      console.warn(`generateImpactsByOrderFlow called for order ${input.targetOrder} without parentImpacts. Returning empty.`);
+      return { generatedImpacts: [] };
     }
 
     const isTargetOrder1 = input.targetOrder === '1';
