@@ -22,7 +22,7 @@ export const ImpactSchema = z.object({
   parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
   keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
-  causalReasoning: z.string().optional().describe('Explanation of why this impact is a consequence of its parent impact, if applicable (for 2nd/3rd order).'),
+  causalReasoning: z.string().optional().describe('Explanation of why this impact is a plausible consequence of its preceding impacts. For first-order impacts, this explains their link to the initial assertion.'),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -67,14 +67,12 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
   order: 0 | 1 | 2 | 3; // 0 for core assertion
   nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT';
   // Properties store data that might not be on ImpactSchema directly or is specific to UI/type (like fullAssertionText for core)
-  // keyConcepts and attributes are now directly on ImpactNode via extending Impact.
-  // CausalReasoning is also directly on ImpactNode.
-  properties?: {
+  properties: {
     fullAssertionText?: string; // Specific to CORE_ASSERTION
     coreComponents?: string[]; // Specific to CORE_ASSERTION
-    // We can mirror keyConcepts/attributes here if we have other dynamic properties to add,
-    // but for display, accessing them directly from ImpactNode is now preferred.
-    [key: string]: any; 
+    keyConcepts?: StructuredConcept[]; // Mirror from Impact.keyConcepts for easy access in panel
+    attributes?: string[]; // Mirror from Impact.attributes for easy access in panel
+    [key: string]: any;
   };
   originalColor?: string;
 }
@@ -98,7 +96,8 @@ export const VALIDITY_OPTIONS: Array<{ value: 'high' | 'medium' | 'low'; label: 
 ];
 
 export enum ExplorerStep {
-  INITIAL = 'initial',
+  GOAL_SELECTION = 'goal_selection', // New initial step
+  INITIAL = 'initial', // Now means ready for assertion input
   REFLECTION_PENDING = 'reflection_pending',
   REFLECTION_REVIEW = 'reflection_review',
   ORDER_1_PENDING = 'order_1_pending',
@@ -112,3 +111,11 @@ export enum ExplorerStep {
   CONSOLIDATION_PENDING = 'consolidation_pending',
 }
 
+export interface GoalOption {
+  id: string;
+  title: string;
+  description: string;
+  promptLabel: string;
+  placeholder: string;
+  icon?: React.ElementType;
+}
