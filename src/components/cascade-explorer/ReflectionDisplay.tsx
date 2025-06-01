@@ -1,20 +1,19 @@
 
 "use client";
 
-import type { AIReflectAssertionOutput, SystemModel, SystemStock, SystemAgent, SystemIncentive } from '@/types/cascade'; // Updated import
+import type { AIReflectAssertionOutput, SystemModel } from '@/types/cascade';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, Loader2, Package, Users, TrendingUp, ArrowRightLeft } from 'lucide-react'; // Added icons
+import { Check, Loader2, Package, Users, TrendingUp, ArrowRightLeft, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface ReflectionDisplayProps {
   reflection: AIReflectAssertionOutput;
-  onConfirm: () => void;
-  isLoadingConfirmation: boolean;
-  confirmButtonText?: string;
+  showSystemModelDetails?: boolean; // New prop
+  // Confirmation button and logic are now handled in page.tsx to accommodate tabs
 }
 
-const renderSystemModel = (systemModel: SystemModel) => {
+const renderSystemModelList = (systemModel: SystemModel) => {
   return (
     <div className="space-y-4">
       <div>
@@ -77,55 +76,43 @@ const renderSystemModel = (systemModel: SystemModel) => {
 };
 
 
-export function ReflectionDisplay({ reflection, onConfirm, isLoadingConfirmation, confirmButtonText = "Yes, this is correct. Generate Impact Map." }: ReflectionDisplayProps): JSX.Element {
+export function ReflectionDisplay({ 
+  reflection, 
+  showSystemModelDetails = true, // Default to true
+}: ReflectionDisplayProps): JSX.Element {
   return (
-    <Card className="mt-6 shadow-lg bg-card text-card-foreground">
-      <CardHeader>
-        <CardTitle className="text-xl">Assertion Reflection</CardTitle>
-        <CardDescription>Please review the AI's understanding of your assertion, including the identified system model.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <h3 className="font-semibold text-primary">Summary:</h3>
-          <p>{reflection.summary}</p>
-        </div>
-        <div>
-          <h3 className="font-semibold text-primary">Reflection Statement:</h3>
-          <p>{reflection.reflection}</p>
-        </div>
-        
+    // Removed outer Card to allow page.tsx to control overall card structure for this step
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-semibold text-primary">Summary:</h3>
+        <p>{reflection.summary}</p>
+      </div>
+      <div>
+        <h3 className="font-semibold text-primary">Reflection Statement:</h3>
+        <p>{reflection.reflection}</p>
+      </div>
+      
+      {showSystemModelDetails && reflection.systemModel && (
         <div className="border-t border-border pt-4">
-          <h3 className="font-semibold text-primary text-lg mb-3">Proposed System Model:</h3>
-          {reflection.systemModel ? renderSystemModel(reflection.systemModel) : <p>No system model extracted.</p>}
+          <h3 className="font-semibold text-primary text-lg mb-3">Proposed System Model (List View):</h3>
+          {renderSystemModelList(reflection.systemModel)}
         </div>
+      )}
 
-        {reflection.keyConcepts && reflection.keyConcepts.length > 0 && (
-          <div className="border-t border-border pt-4">
-            <h3 className="font-semibold text-primary">General Key Concepts:</h3>
-             <div className="flex flex-wrap gap-2 mt-2">
-                {reflection.keyConcepts.map((concept, index) => (
-                    <Badge key={`gen-concept-${index}`} variant="secondary">
-                    {concept.name}
-                    {concept.type && <span className="ml-1 opacity-75">({concept.type})</span>}
-                    </Badge>
-                ))}
-            </div>
+      {showSystemModelDetails && reflection.keyConcepts && reflection.keyConcepts.length > 0 && (
+        <div className="border-t border-border pt-4">
+          <h3 className="font-semibold text-primary">General Key Concepts:</h3>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {reflection.keyConcepts.map((concept, index) => (
+                  <Badge key={`gen-concept-${index}`} variant="secondary">
+                  {concept.name}
+                  {concept.type && <span className="ml-1 opacity-75">({concept.type})</span>}
+                  </Badge>
+              ))}
           </div>
-        )}
-
-        <div className="border-t border-border pt-4">
-          <h3 className="font-semibold text-primary">Confirmation Question:</h3>
-          <p className="italic">{reflection.confirmationQuestion}</p>
         </div>
-      </CardContent>
-      <CardFooter>
-        <Button onClick={onConfirm} disabled={isLoadingConfirmation} className="w-full sm:w-auto">
-          {isLoadingConfirmation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-          {confirmButtonText}
-        </Button>
-      </CardFooter>
-    </Card>
+      )}
+      {/* Confirmation question and button are now handled in page.tsx to sit outside tabs */}
+    </div>
   );
 }
-
-    

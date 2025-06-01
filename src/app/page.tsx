@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
 import { reflectAssertion, type AIReflectAssertionOutput } from '@/ai/flows/assertion-reflection';
 import { generateImpactsByOrder, type GenerateImpactsByOrderInput, type GenerateImpactsByOrderOutput as AIGenerateImpactsByOrderOutput } from '@/ai/flows/generate-impacts-by-order';
 import { suggestImpactConsolidation, type SuggestImpactConsolidationOutput, type ConsolidatedImpactSuggestion } from '@/ai/flows/suggest-impact-consolidation';
@@ -11,12 +12,14 @@ import { ExplorerStep } from '@/types/cascade';
 import { AssertionInputForm } from '@/components/cascade-explorer/AssertionInputForm';
 import { ReflectionDisplay } from '@/components/cascade-explorer/ReflectionDisplay';
 import NetworkGraph from '@/components/cascade-explorer/NetworkGraph';
+import SystemModelGraph from '@/components/cascade-explorer/SystemModelGraph'; // New Import
 import { NodeDetailPanel } from '@/components/cascade-explorer/NodeDetailPanel';
 import { ConsolidationSuggestionsDisplay } from '@/components/cascade-explorer/ConsolidationSuggestionsDisplay';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles } from 'lucide-react';
+import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow } from 'lucide-react'; // Added List, Workflow
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // New Import for Tabs
 
 const CORE_ASSERTION_ID = 'core-assertion';
 
@@ -25,7 +28,7 @@ const goalOptions: GoalOption[] = [
     id: 'decision',
     title: "Test a Decision",
     description: "See potential outcomes before committing to a choice.",
-    promptLabel: "What decision are you considering?", // Retained for potential future use if goal selection becomes more explicit again
+    promptLabel: "What decision are you considering?",
     placeholder: "Should our company adopt a 4-day work week?",
     icon: HelpCircle,
   },
@@ -63,8 +66,8 @@ export default function CascadeExplorerPage() {
   const [allImpactNodes, setAllImpactNodes] = useState<ImpactNode[]>([]);
   const [graphLinks, setGraphLinks] = useState<ImpactLink[]>([]);
 
-  const [uiStep, setUiStep] = useState<ExplorerStep>(ExplorerStep.INITIAL); // Start directly at input
-  const [currentGoalType, setCurrentGoalType] = useState<string>(goalOptions[3].id); // Default to general exploration
+  const [uiStep, setUiStep] = useState<ExplorerStep>(ExplorerStep.INITIAL);
+  const [currentGoalType, setCurrentGoalType] = useState<string>(goalOptions[3].id);
   const [consolidationSuggestions, setConsolidationSuggestions] = useState<SuggestImpactConsolidationOutput | null>(null);
 
   const [selectedNode, setSelectedNode] = useState<ImpactNode | null>(null);
@@ -72,6 +75,7 @@ export default function CascadeExplorerPage() {
 
   const [cascadeSummary, setCascadeSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState<boolean>(false);
+  const [reflectionViewMode, setReflectionViewMode] = useState<'list' | 'graph'>('list'); // New state for view mode
 
   const allImpactNodesRef = useRef(allImpactNodes);
   useEffect(() => {
@@ -106,11 +110,12 @@ export default function CascadeExplorerPage() {
     setAllImpactNodes([]);
     setGraphLinks([]);
     setConsolidationSuggestions(null);
-    setCurrentAssertionText(assertion); // Ensure this is set from form's current value
+    setCurrentAssertionText(assertion);
     setCascadeSummary(null);
     setSelectedNode(null);
     setIsNodePanelOpen(false);
     setIsGeneratingSummary(false);
+    setReflectionViewMode('list'); // Reset to list view
     try {
       const result = await reflectAssertion({ assertion });
       setReflectionResult(result);
@@ -183,9 +188,6 @@ export default function CascadeExplorerPage() {
                                  impact.description && impact.description.trim() !== "" &&
                                  impact.validity &&
                                  impact.reasoning && impact.reasoning.trim() !== "";
-        // Causal reasoning is important but might be contextually empty for order 1 if AI decides so based on prompt.
-        // For order > 1, causalReasoning should ideally always be there.
-        // However, strict validation of causalReasoning being non-empty might be too restrictive if AI sometimes omits it.
         return hasEssentialFields;
       });
 
@@ -206,10 +208,10 @@ export default function CascadeExplorerPage() {
         description: impact.description,
         validity: impact.validity,
         reasoning: impact.reasoning,
-        parentId: undefined, // Will be deterministically set below
+        parentId: undefined,
         keyConcepts: impact.keyConcepts || [],
         attributes: impact.attributes || [],
-        causalReasoning: impact.causalReasoning, // AI provides this based on its understanding
+        causalReasoning: impact.causalReasoning,
         order: targetOrder,
         nodeSystemType: 'GENERATED_IMPACT',
         properties: {
@@ -248,20 +250,18 @@ export default function CascadeExplorerPage() {
           const coreNodeForLinking = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
           if (coreNodeForLinking) {
               newNodesFromAI.forEach(newNode => {
-                  newNode.parentId = CORE_ASSERTION_ID; // Deterministic parent for 1st order
+                  newNode.parentId = CORE_ASSERTION_ID;
                   newLinksGeneratedThisStep.push({ source: coreNodeForLinking.id, target: newNode.id });
               });
           } else {
                console.error("Core assertion node not found for linking 1st order impacts. allImpactNodesRef.current IDs:", allImpactNodesRef.current.map(n => n.id));
           }
       } else if (targetOrder > 1 && parentNodesForLinking.length > 0) {
-        // Deterministic parent assignment for 2nd and 3rd order impacts
         newNodesFromAI.forEach((newNode, index) => {
-            const parentNode = parentNodesForLinking[index % parentNodesForLinking.length]; // Round-robin
+            const parentNode = parentNodesForLinking[index % parentNodesForLinking.length];
             newNode.parentId = parentNode.id;
             const linkToAdd = { source: parentNode.id, target: newNode.id };
             newLinksGeneratedThisStep.push(linkToAdd);
-            // console.log(`[DEBUG] Deterministic Linking (Order ${targetOrder}): Child "${newNode.label}" (ID: ${newNode.id}) linked to Parent "${parentNode.label}" (ID: ${parentNode.id})`);
         });
       } else if (targetOrder > 1 && parentNodesForLinking.length === 0) {
         console.warn(`Cannot link order ${targetOrder} impacts as parentNodesForLinking is empty.`);
@@ -282,10 +282,9 @@ export default function CascadeExplorerPage() {
         return Array.from(linkMap.values());
       });
 
-      // Update the parentId on the actual node objects in allImpactNodes state
       setAllImpactNodes(prevNodes => {
         const nodeMap = new Map(prevNodes.map(n => [n.id, n]));
-        newNodesFromAI.forEach(updatedNode => { // 'updatedNode' here has its parentId set deterministically
+        newNodesFromAI.forEach(updatedNode => {
           if (nodeMap.has(updatedNode.id)) {
             nodeMap.set(updatedNode.id, { ...nodeMap.get(updatedNode.id)!, ...updatedNode });
           } else {
@@ -352,10 +351,10 @@ export default function CascadeExplorerPage() {
         description: node.description,
         validity: node.validity,
         reasoning: node.reasoning,
-        parentId: node.parentId, // This is the deterministically assigned parentId
+        parentId: node.parentId,
         keyConcepts: keyConcepts,
         attributes: attributes,
-        causalReasoning: node.causalReasoning, // This is AI-generated reasoning
+        causalReasoning: node.causalReasoning,
     };
   };
 
@@ -610,7 +609,7 @@ export default function CascadeExplorerPage() {
                     parentAssigned = true;
                 }
             } else if (potentialParents.length > 0) {
-                const chosenParent = potentialParents[0]; // Deterministic choice (first available)
+                const chosenParent = potentialParents[0];
                 newGraphNode.parentId = chosenParent.id;
                 finalNewLinks.push({ source: chosenParent.id, target: newGraphNode.id });
                 parentAssigned = true;
@@ -619,7 +618,7 @@ export default function CascadeExplorerPage() {
         if (!parentAssigned) {
            console.warn(`[Consolidation Fallback] Consolidated node ${newGraphNode.id} (Order ${newGraphNode.order}) could not be deterministically linked to a preferred parent. Its suggested parentId was: ${newGraphNode.parentId}. Linking to CORE_ASSERTION as last resort if applicable.`);
             const coreParent = nextNodes.find(n => n.id === CORE_ASSERTION_ID);
-            if (coreParent && newGraphNode.order >=1) { // Check order before linking to core
+            if (coreParent && newGraphNode.order >=1) {
                  newGraphNode.parentId = CORE_ASSERTION_ID;
                  finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
                  console.warn(`[Consolidation Fallback] Consolidated node ${newGraphNode.id} linked to CORE_ASSERTION as fallback.`);
@@ -628,7 +627,6 @@ export default function CascadeExplorerPage() {
             }
         }
     }
-    // Update the node in nextNodes if its parentId was changed by fallback logic
     nextNodes = nextNodes.map(n => n.id === newGraphNode.id ? newGraphNode : n);
 
 
@@ -636,7 +634,7 @@ export default function CascadeExplorerPage() {
     finalNewLinks.forEach(link => {
       const src = typeof link.source === 'object' ? (link.source as ImpactNode).id : String(link.source);
       const tgt = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
-      if (src === tgt) return; // Avoid self-loops if any were accidentally created
+      if (src === tgt) return;
       uniqueLinks.set(`${src}:::${tgt}`, { source: src, target: tgt });
     });
     const dedupedFinalNewLinks = Array.from(uniqueLinks.values());
@@ -649,9 +647,8 @@ export default function CascadeExplorerPage() {
       if (!prev) return null;
       const suggestionsToKeep = prev.consolidationSuggestions.filter(s => {
         if (s.consolidatedImpact.id === suggestion.consolidatedImpact.id) {
-          return false; // Remove the applied suggestion
+          return false;
         }
-        // Also remove any other suggestions that involved one of the now-consolidated originalImpactIds
         const isDependent = s.originalImpactIds.some(id => originalImpactIds.includes(id));
         if (isDependent) {
           dependentSuggestionsRemovedCount++;
@@ -692,9 +689,11 @@ export default function CascadeExplorerPage() {
   const visibleNodes = useMemo(() => {
     const currentNodes = allImpactNodes;
 
-    if (uiStep === ExplorerStep.INITIAL && !reflectionResult) return []; // Don't show core node before reflection
+    if (uiStep === ExplorerStep.INITIAL && !reflectionResult) return [];
     if (uiStep === ExplorerStep.REFLECTION_PENDING) return [];
     if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) {
+      // For reflection review, we only want the core assertion node for the main graph
+      // The system model graph will be its own separate visualization
       return currentNodes.filter(n => n.order === 0);
     }
 
@@ -728,7 +727,6 @@ export default function CascadeExplorerPage() {
       const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
       return visibleNodeIds.has(sourceId) && visibleNodeIds.has(targetId);
     });
-    // console.log("[DEBUG] visibleLinks updated:", filteredLinks.length, "links visible out of", currentLinksFromState.length, "total links for", visibleNodes.length, "visible nodes.");
     return filteredLinks;
   }, [visibleNodes, graphLinks]);
 
@@ -777,7 +775,7 @@ export default function CascadeExplorerPage() {
                       <goal.icon className="w-4 h-4 mr-2 shrink-0 text-primary" />
                       <div>
                         <span className="block text-sm text-foreground">{goal.placeholder}</span>
-                        <span className="block text-xs text-muted-foreground_italic_">({goal.title})</span>
+                        <span className="block text-xs text-muted-foreground italic">({goal.title})</span>
                       </div>
                     </Button>
                   ))}
@@ -792,15 +790,43 @@ export default function CascadeExplorerPage() {
         if (!reflectionResult) return commonLoading("Loading reflection...");
         return (
           <Card className="shadow-xl bg-card">
-            <CardHeader><CardTitle className="text-2xl text-primary">Step 2: Confirm Understanding</CardTitle></CardHeader>
+            <CardHeader>
+                <CardTitle className="text-2xl text-primary">Step 2: Confirm Understanding</CardTitle>
+                <CardDescription>Review the AI's interpretation and the extracted system model.</CardDescription>
+            </CardHeader>
             <CardContent>
               <ReflectionDisplay
                 reflection={reflectionResult}
-                onConfirm={handleConfirmReflectionAndFetchFirstOrder}
-                isLoadingConfirmation={isLoading || uiStep === ExplorerStep.ORDER_1_PENDING}
-                confirmButtonText="Correct. Generate 1st Order Impacts"
+                showSystemModelDetails={reflectionViewMode === 'list'} // Control visibility
               />
+              <Tabs value={reflectionViewMode} onValueChange={(value) => setReflectionViewMode(value as 'list' | 'graph')} className="w-full mt-4 mb-2">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="list"><List className="mr-2 h-4 w-4" />List View</TabsTrigger>
+                  <TabsTrigger value="graph"><Workflow className="mr-2 h-4 w-4" />Graph View</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {reflectionViewMode === 'graph' && reflectionResult.systemModel && (
+                <Card className="mt-0 shadow-md bg-card/50 border-input">
+                  <CardHeader><CardTitle className="text-lg text-accent">System Model Graph</CardTitle></CardHeader>
+                  <CardContent className="min-h-[300px] md:min-h-[400px]">
+                    <SystemModelGraph systemModel={reflectionResult.systemModel} />
+                  </CardContent>
+                </Card>
+              )}
+              
             </CardContent>
+            <CardFooter className="flex-col items-stretch gap-4">
+                 <p className="text-sm text-muted-foreground italic">{reflectionResult.confirmationQuestion}</p>
+                <Button 
+                    onClick={handleConfirmReflectionAndFetchFirstOrder} 
+                    disabled={isLoading || uiStep === ExplorerStep.ORDER_1_PENDING} 
+                    className="w-full bg-primary text-primary-foreground"
+                >
+                    {isLoading || uiStep === ExplorerStep.ORDER_1_PENDING ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Correct. Generate 1st Order Impacts
+                </Button>
+            </CardFooter>
           </Card>
         );
       case ExplorerStep.ORDER_1_PENDING: return commonLoading("Generating 1st Order Impacts...");
@@ -852,8 +878,8 @@ export default function CascadeExplorerPage() {
               )}
               { (uiStep === ExplorerStep.FINAL_REVIEW) && (
                  <Button onClick={() => {
-                    setUiStep(ExplorerStep.INITIAL); // Reset to initial input screen
-                    setCurrentGoalType(goalOptions[3].id); // Reset to general
+                    setUiStep(ExplorerStep.INITIAL);
+                    setCurrentGoalType(goalOptions[3].id);
                     setCurrentAssertionText('');
                     setReflectionResult(null);
                     setAllImpactNodes([]);
@@ -863,6 +889,7 @@ export default function CascadeExplorerPage() {
                     setSelectedNode(null);
                     setIsNodePanelOpen(false);
                     setIsGeneratingSummary(false);
+                    setReflectionViewMode('list');
                  }} className="bg-blue-500 hover:bg-blue-600 text-white">
                   <RotateCcw className="mr-2 h-4 w-4" /> Start New Exploration
                 </Button>
@@ -901,15 +928,20 @@ export default function CascadeExplorerPage() {
 
   const getGraphTitle = () => {
     if (uiStep === ExplorerStep.INITIAL || uiStep === ExplorerStep.REFLECTION_PENDING) return "Define Your Assertion";
-    if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Core Assertion";
+    // For REFLECTION_REVIEW, the main "Impact Network" graph isn't shown yet,
+    // as it only contains the core node. The System Model graph is handled separately.
+    if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Core Assertion Awaiting Impact Generation";
 
-    if (visibleNodes.length > 0 && (uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.INITIAL)) {
+
+    if (visibleNodes.length > 0 && (uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_REVIEW)) {
         if (uiStep === ExplorerStep.ORDER_1_PENDING || uiStep === ExplorerStep.ORDER_1_REVIEW) return "Impact Network (1st Order)";
         if (uiStep === ExplorerStep.ORDER_2_PENDING || uiStep === ExplorerStep.ORDER_2_REVIEW) return "Impact Network (Up to 2nd Order)";
         if (uiStep === ExplorerStep.ORDER_3_PENDING || uiStep === ExplorerStep.ORDER_3_REVIEW) return "Impact Network (Up to 3rd Order)";
         if (uiStep === ExplorerStep.GENERATING_SUMMARY) return "Impact Network (Full Map - Generating Summary)";
         if (uiStep === ExplorerStep.FINAL_REVIEW || (uiStep === ExplorerStep.CONSOLIDATION_PENDING && visibleNodes.length > 0)) return "Impact Network (Full Map)";
     }
+     // Fallback if no other condition met but nodes exist (e.g., after reflection review before 1st order loads)
+    if (reflectionResult && allImpactNodes.some(n => n.order === 0)) return "Core Assertion Awaiting Impact Generation";
     return "Impact Network";
   };
 
@@ -917,9 +949,9 @@ export default function CascadeExplorerPage() {
     const currentStep = uiStep;
 
     if (currentStep === ExplorerStep.INITIAL || currentStep === ExplorerStep.REFLECTION_PENDING ) return "Enter your input to begin exploring its cascading impacts.";
-    if (currentStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Core assertion reflected by AI. Confirm to generate first-order impacts.";
+    if (currentStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Review the AI's understanding above. The main impact graph will build once you proceed.";
 
-    if (visibleNodes.length > 0 && (currentStep !== ExplorerStep.REFLECTION_PENDING && currentStep !== ExplorerStep.INITIAL)) {
+    if (visibleNodes.length > 0 && (currentStep !== ExplorerStep.REFLECTION_PENDING && currentStep !== ExplorerStep.INITIAL && currentStep !== ExplorerStep.REFLECTION_REVIEW)) {
         let orderText = 'all visible';
         if (currentStep === ExplorerStep.ORDER_1_REVIEW || currentStep === ExplorerStep.ORDER_1_PENDING) {
             orderText = 'displaying 1st order';
@@ -932,6 +964,8 @@ export default function CascadeExplorerPage() {
         }
          return `Explore the generated impacts. Click nodes for details. Currently ${orderText} impacts. Current step: ${ExplorerStep[currentStep] || currentStep}`;
     }
+    if (reflectionResult && allImpactNodes.some(n => n.order === 0)) return "The main impact graph will build once you generate first-order impacts.";
+
 
     const earlyLoadingSteps = [ExplorerStep.REFLECTION_PENDING, ExplorerStep.ORDER_1_PENDING, ExplorerStep.ORDER_2_PENDING, ExplorerStep.ORDER_3_PENDING, ExplorerStep.CONSOLIDATION_PENDING, ExplorerStep.GENERATING_SUMMARY];
     if (earlyLoadingSteps.includes(currentStep)) {
@@ -954,8 +988,8 @@ export default function CascadeExplorerPage() {
       <main className="flex-grow flex flex-col gap-6">
         {renderStepContent()}
 
-        {/* {console.log("[DEBUG] Rendering NetworkGraph. Visible nodes:", visibleNodes.length, "Visible links:", visibleLinks.length, "UI Step:", uiStep)} */}
-        {visibleNodes.length > 0 && (uiStep !== ExplorerStep.INITIAL || reflectionResult) && (uiStep !== ExplorerStep.REFLECTION_PENDING) && (
+        {/* Only show main impact network graph AFTER reflection review step */}
+        {visibleNodes.length > 0 && uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.REFLECTION_REVIEW && (
           <Card className="shadow-xl bg-card flex-grow flex flex-col min-h-[600px] mt-6">
             <CardHeader>
               <CardTitle className="text-2xl text-primary flex items-center">
