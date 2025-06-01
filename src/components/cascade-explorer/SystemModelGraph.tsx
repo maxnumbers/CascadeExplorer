@@ -30,7 +30,8 @@ interface SystemModelGraphProps {
 const STOCK_COLOR = 'hsl(var(--primary))'; // Electric Blue for stocks
 const AGENT_COLOR = 'hsl(var(--accent))';  // Soft Purple for agents
 const LINK_COLOR = 'hsl(var(--border))';
-const TEXT_COLOR = 'hsl(var(--foreground))';
+const NODE_TEXT_COLOR = 'hsl(var(--primary-foreground))'; // Dark Grey for contrast on light nodes
+const LINK_LABEL_COLOR = 'hsl(var(--muted-foreground))'; // Lighter grey for link labels
 const BG_COLOR = 'hsl(var(--card))';
 
 
@@ -170,7 +171,7 @@ const SystemModelGraph: React.FC<SystemModelGraphProps> = ({ systemModel, width 
       .text(d => d.label)
       .attr("font-size", "10px")
       .attr("font-weight", "500")
-      .attr("fill", TEXT_COLOR)
+      .attr("fill", NODE_TEXT_COLOR) // Changed to NODE_TEXT_COLOR
       .attr("text-anchor", "middle")
       .attr("dy", d => d.type === 'stock' ? "0.35em" : "0.35em") // Center text in shapes
       .style("pointer-events", "none")
@@ -186,12 +187,16 @@ const SystemModelGraph: React.FC<SystemModelGraphProps> = ({ systemModel, width 
       .data(d3Links)
       .join("text")
       .attr("class", "link-label")
-      .attr("font-size", "8px")
-      .attr("fill", TEXT_COLOR)
+      .attr("font-size", "9px") // Increased font size
+      .attr("fill", LINK_LABEL_COLOR) // Changed to LINK_LABEL_COLOR
       .attr("text-anchor", "middle")
-      .text(d => d.label.length > 30 ? d.label.substring(0,27) + "..." : d.label) // Truncate long labels
+      .attr("paint-order", "stroke") // Render stroke first, then fill
+      .attr("stroke", BG_COLOR) // Use background color for a subtle outline
+      .attr("stroke-width", "0.2em")
+      .attr("stroke-linejoin", "round")
+      .text(d => d.label.length > 35 ? d.label.substring(0,32) + "..." : d.label) // Truncate long labels slightly more
       .append("title") // Full label on hover
-         .text(d => `${d.label}${d.flow ? `\nFlow: ${d.flow}` : ''}`);
+         .text(d => `Incentive: ${d.label}${d.flow ? `\nResulting Flow: ${d.flow}` : ''}`);
 
 
     simulation.on("tick", () => {
@@ -207,7 +212,7 @@ const SystemModelGraph: React.FC<SystemModelGraphProps> = ({ systemModel, width 
       // Position link labels at the midpoint of the link
       linkLabelElements
         .attr("x", d => (((d.source as SystemGraphNode).x || 0) + ((d.target as SystemGraphNode).x || 0)) / 2)
-        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 5); // Offset slightly above line
+        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 7)); // Offset slightly more above line
     });
     
     simulation.alpha(0.8).restart();
@@ -280,7 +285,17 @@ const SystemModelGraph: React.FC<SystemModelGraphProps> = ({ systemModel, width 
       }
       // Center multi-line text block
       const textBlockHeight = (lineNumber + 1) * (parseFloat(text.style("font-size")) * lineHeight);
-      text.selectAll("tspan").attr("y", parseFloat(y as string) - textBlockHeight / 2 + (parseFloat(text.style("font-size"))*0.8) );
+      // Adjust vertical centering for multi-line text
+      const tspanCount = text.selectAll("tspan").size();
+      const verticalOffset = - ( (tspanCount -1) * (parseFloat(text.style("font-size")) * lineHeight) / 2) + (parseFloat(text.style("font-size"))*0.35) ; // Adjust dy for tspans based on number of lines
+
+      text.selectAll("tspan").attr("dy", (i, n, g) => {
+        if (n[i].textContent === d.label) { // first tspan
+             return verticalOffset + "px";
+        }
+        return (lineHeight) + "em"; // subsequent tspans
+      });
+
 
     });
   }
@@ -294,3 +309,4 @@ const SystemModelGraph: React.FC<SystemModelGraphProps> = ({ systemModel, width 
 };
 
 export default SystemModelGraph;
+
