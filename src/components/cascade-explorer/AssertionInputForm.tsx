@@ -6,11 +6,13 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Loader2, Mic, MicOff } from 'lucide-react';
+import { Loader2, Mic, MicOff, Sparkles } from 'lucide-react';
 
 interface AssertionInputFormProps {
   onSubmit: (assertion: string) => void;
   isLoading: boolean;
+  initialAssertionText: string; // Changed from assertion to initialAssertionText
+  onAssertionChange: (newAssertion: string) => void; // Callback to update parent state
   inputPromptLabel: string;
   placeholder: string;
 }
@@ -18,13 +20,26 @@ interface AssertionInputFormProps {
 export function AssertionInputForm({
   onSubmit,
   isLoading,
+  initialAssertionText,
+  onAssertionChange,
   inputPromptLabel,
   placeholder
 }: AssertionInputFormProps): JSX.Element {
-  const [assertion, setAssertion] = useState('');
+  // Use initialAssertionText to initialize local state, but allow local editing
+  const [currentText, setCurrentText] = useState(initialAssertionText);
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Sync with prop changes for initialAssertionText (e.g., when example button is clicked)
+  useEffect(() => {
+    setCurrentText(initialAssertionText);
+  }, [initialAssertionText]);
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCurrentText(e.target.value);
+    onAssertionChange(e.target.value); // Notify parent of change
+  };
 
   useEffect(() => {
     const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -37,7 +52,9 @@ export function AssertionInputForm({
 
       recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = event.results[0][0].transcript;
-        setAssertion(prev => (prev ? prev.trim() + ' ' + transcript.trim() : transcript.trim()).replace(/\s\s+/g, ' '));
+        const newText = (currentText ? currentText.trim() + ' ' + transcript.trim() : transcript.trim()).replace(/\s\s+/g, ' ');
+        setCurrentText(newText);
+        onAssertionChange(newText); // Notify parent
       };
 
       recognitionInstance.onstart = () => {
@@ -71,7 +88,7 @@ export function AssertionInputForm({
         }
       }
     };
-  }, []);
+  }, [currentText, onAssertionChange]); // Added currentText and onAssertionChange to dependencies
 
   const handleToggleListen = () => {
     if (!recognitionRef.current || !isSpeechSupported) return;
@@ -85,8 +102,8 @@ export function AssertionInputForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (assertion.trim()) {
-      onSubmit(assertion.trim());
+    if (currentText.trim()) {
+      onSubmit(currentText.trim());
     }
   };
 
@@ -98,8 +115,8 @@ export function AssertionInputForm({
         </Label>
         <Textarea
           id="assertion-input"
-          value={assertion}
-          onChange={(e) => setAssertion(e.target.value)}
+          value={currentText} // Use local state for controlled component
+          onChange={handleTextChange} // Use local handler
           placeholder={placeholder}
           rows={4}
           className="w-full bg-card text-card-foreground border-input"
@@ -107,8 +124,8 @@ export function AssertionInputForm({
         />
       </div>
       <div className="flex flex-col sm:flex-row gap-3 items-center">
-        <Button type="submit" disabled={isLoading || !assertion.trim()} className="w-full sm:w-auto">
-          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+        <Button type="submit" disabled={isLoading || !currentText.trim()} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
+          {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
           Analyze & Reflect
         </Button>
         {isSpeechSupported ? (

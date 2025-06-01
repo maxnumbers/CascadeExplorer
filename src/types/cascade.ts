@@ -126,8 +126,7 @@ export const VALIDITY_OPTIONS: Array<{ value: 'high' | 'medium' | 'low'; label: 
 ];
 
 export enum ExplorerStep {
-  GOAL_SELECTION = 'goal_selection', // New initial step
-  INITIAL = 'initial', // Now means ready for assertion input
+  INITIAL = 'initial',
   REFLECTION_PENDING = 'reflection_pending',
   REFLECTION_REVIEW = 'reflection_review',
   ORDER_1_PENDING = 'order_1_pending',
@@ -145,9 +144,7 @@ export interface GoalOption {
   id: string;
   title: string;
   description: string;
-  promptLabel: string;
-  placeholder: string;
+  promptLabel: string; // Main label for the assertion form when this goal is chosen
+  placeholder: string; // Example assertion text / placeholder for the textarea
   icon?: React.ElementType;
 }
-
-    
