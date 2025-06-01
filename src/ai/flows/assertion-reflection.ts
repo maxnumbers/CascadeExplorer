@@ -4,7 +4,8 @@
 'use server';
 
 /**
- * @fileOverview Reflects the user's initial assertion using AI to confirm understanding.
+ * @fileOverview Reflects the user's initial assertion using AI to confirm understanding,
+ * extracting a system model (stocks, agents, incentives) from the assertion.
  *
  * - reflectAssertion - A function that reflects the user's assertion.
  * - ReflectAssertionInput - The input type for the reflectAssertion function.
@@ -13,7 +14,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { StructuredConceptSchema } from '@/types/cascade';
+import { StructuredConceptSchema, SystemModelSchema } from '@/types/cascade'; // Import new SystemModelSchema
 
 const ReflectAssertionInputSchema = z.object({
   assertion: z
@@ -23,10 +24,10 @@ const ReflectAssertionInputSchema = z.object({
 export type ReflectAssertionInput = z.infer<typeof ReflectAssertionInputSchema>;
 
 const ReflectAssertionOutputSchema = z.object({
-  reflection: z.string().describe('The AI-generated reflection of the user assertion.'),
+  reflection: z.string().describe('The AI-generated reflection of the user assertion (1-2 sentences).'),
   summary: z.string().describe('A very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.'),
-  coreComponents: z.array(z.string()).describe('Key elements of the assertion.'),
-  keyConcepts: z.array(StructuredConceptSchema).describe("A list of key concepts or entities (each as an object with a 'name' and an optional 'type' like 'Technology', 'Person', 'Organization') mentioned in the assertion."),
+  systemModel: SystemModelSchema.describe("A system model identified from the assertion, including key 'stocks' (accumulations/resources), 'agents' (actors), and 'incentives' (agents' motivations towards stocks, and resulting flows)."),
+  keyConcepts: z.array(StructuredConceptSchema).describe("A list of general key concepts or entities (each as an object with a 'name' and an optional 'type' like 'Technology', 'Person', 'Organization') mentioned in the assertion, distinct from the system model components but potentially overlapping."),
   confirmationQuestion: z.string().describe('A question to confirm understanding with the user.'),
 });
 export type ReflectAssertionOutput = z.infer<typeof ReflectAssertionOutputSchema>;
@@ -39,19 +40,34 @@ const reflectAssertionPrompt = ai.definePrompt({
   name: 'reflectAssertionPrompt',
   input: {schema: ReflectAssertionInputSchema},
   output: {schema: ReflectAssertionOutputSchema},
-  prompt: `You are an AI assistant designed to understand and reflect user assertions.
+  prompt: `You are an AI assistant skilled in systems thinking and understanding user assertions.
+Your task is to analyze the user's assertion and provide a structured reflection.
 
-You will receive an assertion from the user. Your task is to:
+User's Assertion:
+"{{assertion}}"
 
-1.  Create a concise summary of the assertion, ideally 5-10 words, suitable as a short title (for the 'summary' field).
-2.  Provide a more detailed reflection of the assertion in 1-2 clear sentences (for the 'reflection' field).
-3.  Identify the core components of the assertion (usually 2-3 main parts).
-4.  Identify a list of key concepts or entities mentioned in the assertion. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). This list goes into the 'keyConcepts' field.
-5.  Generate a question to confirm your understanding with the user.
+Based on this assertion, you must:
 
-Here is the assertion:
+1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
+2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
+3.  **System Model ('systemModel')**: Analyze the assertion to identify components of a basic system model. This is crucial.
+    *   **Stocks**: Identify 2-4 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt'). For each stock, provide:
+        *   'name': A concise name for the stock.
+        *   'description' (optional): A brief explanation of what this stock represents.
+    *   **Agents**: Identify 2-4 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
+        *   'name': A concise name for the agent.
+        *   'description' (optional): A brief explanation of this agent's role or nature.
+    *   **Incentives**: For 1-3 of the most prominent agents identified, describe their primary 'incentives' related to one or more of the identified stocks. An incentive describes what motivates an agent and how this motivation might lead to an action or flow that affects a stock. For each incentive, provide:
+        *   'agentName': The name of the agent.
+        *   'targetStockName': The name of the stock the incentive is primarily directed towards.
+        *   'incentiveDescription': A clear description of the agent's motivation or goal concerning the stock.
+        *   'resultingFlow' (optional): A brief description of the typical action or flow this incentive drives from the agent, which would affect the stock (e.g., "Increases R&D spending", "Reduces carbon emissions", "Buys more product", "Lobbies for deregulation").
+    *   Aim for a balanced and interconnected system model directly derivable from the assertion.
+4.  **General Key Concepts ('keyConcepts')**: Separately from the system model, identify a list of 2-5 general key concepts or entities mentioned in the assertion. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). These might overlap with system model elements but represent broader themes.
+5.  **Confirmation Question ('confirmationQuestion')**: Generate a concise question to ask the user to confirm your understanding of their assertion, focusing on the core intent or the system you've identified.
 
-{{assertion}}
+Ensure your entire output strictly adheres to the requested JSON schema structure.
+The 'systemModel' component is particularly important for systems thinking.
 `,
 });
 
@@ -66,3 +82,5 @@ const reflectAssertionFlow = ai.defineFlow(
     return output!;
   }
 );
+
+    

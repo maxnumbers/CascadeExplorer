@@ -13,6 +13,34 @@ export const StructuredConceptSchema = z.object({
 });
 export type StructuredConcept = z.infer<typeof StructuredConceptSchema>;
 
+export const SystemStockSchema = z.object({
+  name: z.string().describe("Name of the stock (e.g., 'Public Trust', 'Market Share')."),
+  description: z.string().optional().describe("Brief description of what this stock represents or how it's measured.")
+});
+export type SystemStock = z.infer<typeof SystemStockSchema>;
+
+export const SystemAgentSchema = z.object({
+  name: z.string().describe("Name of the agent (e.g., 'Government', 'Consumers')."),
+  description: z.string().optional().describe("Brief description of this agent's role or characteristics in the system.")
+});
+export type SystemAgent = z.infer<typeof SystemAgentSchema>;
+
+export const SystemIncentiveSchema = z.object({
+  agentName: z.string().describe("The name of the agent possessing the incentive."),
+  targetStockName: z.string().describe("The name of the stock this incentive is directed towards affecting."),
+  incentiveDescription: z.string().describe("Description of the agent's motivation or goal regarding the stock."),
+  resultingFlow: z.string().optional().describe("A brief description of the flow or action this incentive typically drives from the agent, affecting the stock (e.g., 'Increases investment', 'Reduces consumption').")
+});
+export type SystemIncentive = z.infer<typeof SystemIncentiveSchema>;
+
+export const SystemModelSchema = z.object({
+  stocks: z.array(SystemStockSchema).describe("Key accumulations or resources in the system that can change over time."),
+  agents: z.array(SystemAgentSchema).describe("Actors or entities within the system that can influence stocks."),
+  incentives: z.array(SystemIncentiveSchema).describe("Primary incentives of agents related to identified stocks, and the flows they drive.")
+});
+export type SystemModel = z.infer<typeof SystemModelSchema>;
+
+
 export const ImpactSchema = z.object({
   id: z.string().describe('Unique identifier for the impact.'),
   label: z.string().describe('Short label for the impact (2-3 lines max).'),
@@ -55,9 +83,11 @@ export type CascadeSummaryOutput = z.infer<typeof CascadeSummaryOutputSchema>;
 
 
 // Re-export AI types for easier access if needed elsewhere
-export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'keyConcepts'> & {
-  keyConcepts: StructuredConcept[];
+export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'coreComponents' | 'keyConcepts'> & {
+  systemModel: SystemModel;
+  keyConcepts: StructuredConcept[]; // Keep this for general key concepts from the assertion text itself
 };
+
 
 export type AIGenerateImpactsByOrderInput = AIGenerateImpactsByOrderInputOriginal;
 export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOriginal;
@@ -69,8 +99,8 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
   // Properties store data that might not be on ImpactSchema directly or is specific to UI/type (like fullAssertionText for core)
   properties: {
     fullAssertionText?: string; // Specific to CORE_ASSERTION
-    coreComponents?: string[]; // Specific to CORE_ASSERTION
-    keyConcepts?: StructuredConcept[]; // Mirror from Impact.keyConcepts for easy access in panel
+    systemModel?: SystemModel; // Specific to CORE_ASSERTION, replaces coreComponents
+    keyConcepts?: StructuredConcept[]; // Mirror from Impact.keyConcepts or from reflection's general key concepts
     attributes?: string[]; // Mirror from Impact.attributes for easy access in panel
     [key: string]: any;
   };
@@ -119,3 +149,5 @@ export interface GoalOption {
   placeholder: string;
   icon?: React.ElementType;
 }
+
+    
