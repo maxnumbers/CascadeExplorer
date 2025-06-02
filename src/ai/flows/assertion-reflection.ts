@@ -50,24 +50,31 @@ Based on this assertion, you must:
 1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
 2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
 3.  **System Model ('systemModel')**: Analyze the assertion to identify components of a basic system model. This is crucial for understanding the underlying dynamics.
-    *   **Stocks**: Identify 2-4 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt'). For each stock, provide:
+    *   **Stocks**: Identify 3-5 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt'). For each stock, provide:
         *   'name': A concise name for the stock.
         *   'description' (optional): A brief explanation of what this stock represents.
-    *   **Agents**: Identify 2-4 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
+    *   **Agents**: Identify 3-5 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
         *   'name': A concise name for the agent.
         *   'description' (optional): A brief explanation of this agent's role or nature.
-    *   **Incentives**: This is a critical part of the system model. For the key agents you've identified, you must describe their primary 'incentives' related to one or more of the identified stocks. Aim to identify at least 2-4 significant incentives that illustrate the dynamics of the system as described or implied in the assertion.
-        To do this, think systematically:
-        1. Take an Agent you have identified.
-        2. Consider each Stock you have identified.
-        3. Ask: What is this Agent's primary motivation or goal (the 'incentiveDescription') concerning this Stock, based *solely on the provided assertion*?
-        4. Then ask: What typical action or 'resultingFlow' (e.g., "Increases R&D spending", "Buys more product", "Reduces hiring") does this incentive drive from the Agent, which directly or indirectly affects the Stock, again, based *solely on the provided assertion*?
-        For each significant incentive you identify, provide:
-        *   'agentName': The name of the agent (must match one of the agents identified above).
-        *   'targetStockName': The name of the stock the incentive is primarily directed towards (must match one of the stocks identified above).
-        *   'incentiveDescription': A clear description of the agent's motivation or goal concerning the stock.
-        *   'resultingFlow' (optional, but highly encouraged): A brief description of the typical action or flow this incentive drives.
-        These incentives and flows reveal the interconnections and dynamics within the system. Ensure these are directly derivable from the user's assertion.
+    *   **Incentives & Flows (Crucial for System Dynamics)**: This part requires careful, systematic thought.
+        *   **Initial Pass - Obvious Connections**: First, based on the stocks and agents you've identified, pinpoint the 2-3 most direct and primary incentives. For these, describe the agent's main motivation regarding a stock and the most likely resulting flow or action, all derived *explicitly* from the user's assertion.
+        *   **Review and Expansion Pass - Holistic System Mapping**:
+            Now, critically review ALL stocks and ALL agents you've listed above. Your goal is to build a more complete map of interdependencies that are *still grounded in the user's assertion*.
+            For EACH Agent previously identified:
+                Systematically go through EACH Stock previously identified (even if you didn't link them in the initial pass).
+                Ask yourself, based *solely and strictly on the user's assertion*:
+                    1.  "What is this Agent's primary motivation or goal (the 'incentiveDescription') concerning *this specific* Stock?" (Revisit or confirm initial thoughts).
+                    2.  "What typical action or 'resultingFlow' (e.g., 'Increases R&D spending', 'Buys more product', 'Reduces hiring', 'Advocates for policy change') does this incentive drive from the Agent, which directly or indirectly affects *this specific* Stock, according to the assertion?"
+                    3.  "Are there any *secondary* or *less obvious but still plausible* incentives this Agent might have towards this Stock, as implied by the assertion?" If so, detail them.
+                    4.  "Does the assertion hint at any *conflicting* incentives for this Agent (e.g., an agent might be incentivized to increase one stock which inadvertently depletes another, both actions stemming from the core assertion)?" If so, detail these.
+            Also consider:
+                *   "Are there any other minor agents, groups, or even abstract forces (e.g., 'Market Demand', 'Technological Obsolescence') *implied by the assertion* that have clear incentives related to the identified stocks?" If a strong case can be made *from the assertion text*, briefly add them as agents and define their key incentive and flow. Be very selective here; do not invent agents not supported by the text.
+        *   **Final Output for Incentives**: Consolidate your findings from both passes. Aim to identify a total of 4-7 *distinct and significant* incentives in your final output. For each, ensure you provide:
+            *   'agentName': The name of the agent (must match one of the agents identified or added).
+            *   'targetStockName': The name of the stock the incentive is primarily directed towards (must match one of_the stocks identified).
+            *   'incentiveDescription': A clear description of the agent's motivation or goal concerning the stock, derived from the assertion.
+            *   'resultingFlow': A brief description of the typical action or flow this incentive drives, as implied by the assertion. This is highly encouraged.
+            These incentives and flows are what truly reveal the system's dynamics. Ensure all are directly derivable from and justified by the user's assertion.
 4.  **General Key Concepts ('keyConcepts')**: Separately from the system model, identify a list of 2-5 general key concepts or entities mentioned in the assertion. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). These might overlap with system model elements but represent broader themes.
 5.  **Confirmation Question ('confirmationQuestion')**: Generate a concise question to ask the user to confirm your understanding of their assertion, focusing on the core intent or the system you've identified.
 
