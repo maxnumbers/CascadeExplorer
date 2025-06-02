@@ -40,8 +40,7 @@ const reflectAssertionPrompt = ai.definePrompt({
   name: 'reflectAssertionPrompt',
   input: {schema: ReflectAssertionInputSchema},
   output: {schema: ReflectAssertionOutputSchema},
-  prompt: `You are an AI assistant skilled in systems thinking and understanding user assertions.
-Your task is to analyze the user's assertion and provide a structured reflection.
+  prompt: `You are an expert Systems Thinker. Your task is to analyze the user's assertion and provide a structured reflection that includes a basic system model.
 
 User's Assertion:
 "{{assertion}}"
@@ -50,24 +49,30 @@ Based on this assertion, you must:
 
 1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
 2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
-3.  **System Model ('systemModel')**: Analyze the assertion to identify components of a basic system model. This is crucial.
+3.  **System Model ('systemModel')**: Analyze the assertion to identify components of a basic system model. This is crucial for understanding the underlying dynamics.
     *   **Stocks**: Identify 2-4 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt'). For each stock, provide:
         *   'name': A concise name for the stock.
         *   'description' (optional): A brief explanation of what this stock represents.
     *   **Agents**: Identify 2-4 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
         *   'name': A concise name for the agent.
         *   'description' (optional): A brief explanation of this agent's role or nature.
-    *   **Incentives**: For 1-3 of the most prominent agents identified, describe their primary 'incentives' related to one or more of the identified stocks. An incentive describes what motivates an agent and how this motivation might lead to an action or flow that affects a stock. For each incentive, provide:
-        *   'agentName': The name of the agent.
-        *   'targetStockName': The name of the stock the incentive is primarily directed towards.
+    *   **Incentives**: This is a critical part of the system model. For the key agents you've identified, you must describe their primary 'incentives' related to one or more of the identified stocks. Aim to identify at least 2-4 significant incentives that illustrate the dynamics of the system as described or implied in the assertion.
+        To do this, think systematically:
+        1. Take an Agent you have identified.
+        2. Consider each Stock you have identified.
+        3. Ask: What is this Agent's primary motivation or goal (the 'incentiveDescription') concerning this Stock, based *solely on the provided assertion*?
+        4. Then ask: What typical action or 'resultingFlow' (e.g., "Increases R&D spending", "Buys more product", "Reduces hiring") does this incentive drive from the Agent, which directly or indirectly affects the Stock, again, based *solely on the provided assertion*?
+        For each significant incentive you identify, provide:
+        *   'agentName': The name of the agent (must match one of the agents identified above).
+        *   'targetStockName': The name of the stock the incentive is primarily directed towards (must match one of the stocks identified above).
         *   'incentiveDescription': A clear description of the agent's motivation or goal concerning the stock.
-        *   'resultingFlow' (optional): A brief description of the typical action or flow this incentive drives from the agent, which would affect the stock (e.g., "Increases R&D spending", "Reduces carbon emissions", "Buys more product", "Lobbies for deregulation").
-    *   Aim for a balanced and interconnected system model directly derivable from the assertion.
+        *   'resultingFlow' (optional, but highly encouraged): A brief description of the typical action or flow this incentive drives.
+        These incentives and flows reveal the interconnections and dynamics within the system. Ensure these are directly derivable from the user's assertion.
 4.  **General Key Concepts ('keyConcepts')**: Separately from the system model, identify a list of 2-5 general key concepts or entities mentioned in the assertion. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). These might overlap with system model elements but represent broader themes.
 5.  **Confirmation Question ('confirmationQuestion')**: Generate a concise question to ask the user to confirm your understanding of their assertion, focusing on the core intent or the system you've identified.
 
 Ensure your entire output strictly adheres to the requested JSON schema structure.
-The 'systemModel' component is particularly important for systems thinking.
+The 'systemModel' component, especially the 'incentives' describing agent-stock interactions, is particularly important for systems thinking.
 `,
 });
 
