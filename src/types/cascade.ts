@@ -81,6 +81,19 @@ export const CascadeSummaryOutputSchema = z.object({
 });
 export type CascadeSummaryOutput = z.infer<typeof CascadeSummaryOutputSchema>;
 
+// Schemas for revising system model with feedback
+export const ReviseSystemModelInputSchema = z.object({
+  currentSystemModel: SystemModelSchema.describe("The current system model to be revised."),
+  userFeedback: z.string().describe("User's textual feedback outlining desired changes or pointing out inaccuracies/omissions in the current system model.")
+});
+export type ReviseSystemModelInput = z.infer<typeof ReviseSystemModelInputSchema>;
+
+export const ReviseSystemModelOutputSchema = z.object({
+  revisedSystemModel: SystemModelSchema.describe("The system model after incorporating user feedback."),
+  revisionSummary: z.string().describe("A brief summary from the AI explaining what changes were made to the system model based on the feedback, and why.")
+});
+export type ReviseSystemModelOutput = z.infer<typeof ReviseSystemModelOutputSchema>;
+
 
 // Re-export AI types for easier access if needed elsewhere
 export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'coreComponents' | 'keyConcepts'> & {
@@ -129,6 +142,7 @@ export enum ExplorerStep {
   INITIAL = 'initial',
   REFLECTION_PENDING = 'reflection_pending',
   REFLECTION_REVIEW = 'reflection_review',
+  REVISING_SYSTEM_MODEL = 'revising_system_model', // New step
   ORDER_1_PENDING = 'order_1_pending',
   ORDER_1_REVIEW = 'order_1_review',
   ORDER_2_PENDING = 'order_2_pending',

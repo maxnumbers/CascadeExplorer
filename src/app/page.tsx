@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
@@ -7,19 +8,21 @@ import { reflectAssertion, type AIReflectAssertionOutput } from '@/ai/flows/asse
 import { generateImpactsByOrder, type GenerateImpactsByOrderInput, type GenerateImpactsByOrderOutput as AIGenerateImpactsByOrderOutput } from '@/ai/flows/generate-impacts-by-order';
 import { suggestImpactConsolidation, type SuggestImpactConsolidationOutput, type ConsolidatedImpactSuggestion } from '@/ai/flows/suggest-impact-consolidation';
 import { generateCascadeSummary, type CascadeSummaryInput, type CascadeSummaryOutput } from '@/ai/flows/generate-cascade-summary';
+import { reviseSystemModelWithFeedback, type ReviseSystemModelInput, type ReviseSystemModelOutput } from '@/ai/flows/revise-system-model-with-feedback'; // New import
 import type { ImpactNode, ImpactLink, Impact, ImpactMappingInputForConsolidation, StructuredConcept, GoalOption, SystemModel } from '@/types/cascade';
 import { ExplorerStep } from '@/types/cascade';
 import { AssertionInputForm } from '@/components/cascade-explorer/AssertionInputForm';
 import { ReflectionDisplay } from '@/components/cascade-explorer/ReflectionDisplay';
 import NetworkGraph from '@/components/cascade-explorer/NetworkGraph';
-import SystemModelGraph from '@/components/cascade-explorer/SystemModelGraph'; // New Import
+import SystemModelGraph from '@/components/cascade-explorer/SystemModelGraph';
 import { NodeDetailPanel } from '@/components/cascade-explorer/NodeDetailPanel';
 import { ConsolidationSuggestionsDisplay } from '@/components/cascade-explorer/ConsolidationSuggestionsDisplay';
+import { SystemModelFeedbackDialog } from '@/components/cascade-explorer/SystemModelFeedbackDialog'; // New import
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow } from 'lucide-react'; // Added List, Workflow
+import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3 } from 'lucide-react'; // Added MessageSquareText, Edit3
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // New Import for Tabs
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CORE_ASSERTION_ID = 'core-assertion';
 
@@ -75,7 +78,8 @@ export default function CascadeExplorerPage() {
 
   const [cascadeSummary, setCascadeSummary] = useState<string | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState<boolean>(false);
-  const [reflectionViewMode, setReflectionViewMode] = useState<'list' | 'graph'>('list'); // New state for view mode
+  const [reflectionViewMode, setReflectionViewMode] = useState<'list' | 'graph'>('list'); 
+  const [isSystemModelFeedbackDialogOpen, setIsSystemModelFeedbackDialogOpen] = useState<boolean>(false); // New state for feedback dialog
 
   const allImpactNodesRef = useRef(allImpactNodes);
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function CascadeExplorerPage() {
 
   const isLoading = useMemo(() => [
     ExplorerStep.REFLECTION_PENDING,
+    ExplorerStep.REVISING_SYSTEM_MODEL, // Added new loading step
     ExplorerStep.ORDER_1_PENDING,
     ExplorerStep.ORDER_2_PENDING,
     ExplorerStep.ORDER_3_PENDING,
@@ -115,7 +120,8 @@ export default function CascadeExplorerPage() {
     setSelectedNode(null);
     setIsNodePanelOpen(false);
     setIsGeneratingSummary(false);
-    setReflectionViewMode('list'); // Reset to list view
+    setReflectionViewMode('list');
+    setIsSystemModelFeedbackDialogOpen(false);
     try {
       const result = await reflectAssertion({ assertion });
       setReflectionResult(result);
@@ -132,6 +138,41 @@ export default function CascadeExplorerPage() {
       setUiStep(ExplorerStep.INITIAL);
     }
   };
+
+  const handleSystemModelRevisionSubmit = async (feedbackText: string): Promise<ReviseSystemModelOutput | null> => {
+    if (!reflectionResult?.systemModel || !feedbackText.trim()) {
+      toast({title: "Missing Data", description: "Cannot revise model without current model and feedback.", variant: "destructive"});
+      return null;
+    }
+    setUiStep(ExplorerStep.REVISING_SYSTEM_MODEL);
+    try {
+      const input: ReviseSystemModelInput = {
+        currentSystemModel: reflectionResult.systemModel,
+        userFeedback: feedbackText,
+      };
+      const result = await reviseSystemModelWithFeedback(input);
+      if (result && result.revisedSystemModel) {
+        setReflectionResult(prev => prev ? { ...prev, systemModel: result.revisedSystemModel } : null);
+        toast({ title: "System Model Revised", description: result.revisionSummary || "AI has revised the system model based on your feedback.", duration: 6000 });
+      } else {
+        toast({ title: "Revision Failed", description: result.revisionSummary || "AI could not revise the model as requested.", variant: "destructive", duration: 6000 });
+      }
+      return result;
+    } catch (error: any) {
+      console.error("Error revising system model:", error);
+      let errorMessage = "Failed to revise system model. Please try again.";
+      if (error.message && (error.message.includes("503") || error.message.includes("Service Unavailable") || error.message.includes("overloaded"))) {
+        errorMessage = "AI Service Error: The model seems to be busy or unavailable for system model revision. Please try again in a few moments.";
+      } else if (error.message) {
+        errorMessage = `System Model Revision Error: ${error.message}`;
+      }
+      toast({ title: "Error Revising System Model", description: errorMessage, variant: "destructive", duration: 7000 });
+      return { revisedSystemModel: reflectionResult.systemModel, revisionSummary: `Error: ${errorMessage}` }; // Return a fallback object
+    } finally {
+      setUiStep(ExplorerStep.REFLECTION_REVIEW); // Return to review step after attempt
+    }
+  };
+
 
  const fetchImpactsForOrder = useCallback(async (targetOrder: 1 | 2 | 3, parentNodesForLinking: ImpactNode[]) => {
     if (!currentAssertionText || !reflectionResult) {
@@ -174,7 +215,7 @@ export default function CascadeExplorerPage() {
 
     try {
       const aiInput: GenerateImpactsByOrderInput = {
-        assertionText: reflectionResult.summary,
+        assertionText: reflectionResult.summary, // Use the AI's summary of the possibly revised assertion/system model
         targetOrder: String(targetOrder) as '1' | '2' | '3',
         parentImpacts: targetOrder > 1 ? parentNodesForLinking.map(mapImpactNodeToImpact) : undefined,
       };
@@ -258,10 +299,16 @@ export default function CascadeExplorerPage() {
           }
       } else if (targetOrder > 1 && parentNodesForLinking.length > 0) {
         newNodesFromAI.forEach((newNode, index) => {
-            const parentNode = parentNodesForLinking[index % parentNodesForLinking.length];
-            newNode.parentId = parentNode.id;
-            const linkToAdd = { source: parentNode.id, target: newNode.id };
-            newLinksGeneratedThisStep.push(linkToAdd);
+            // Ensure parentNode exists before trying to access its id
+            const parentNodeIndex = index % parentNodesForLinking.length;
+            if (parentNodesForLinking[parentNodeIndex]) {
+                const parentNode = parentNodesForLinking[parentNodeIndex];
+                newNode.parentId = parentNode.id;
+                const linkToAdd = { source: parentNode.id, target: newNode.id };
+                newLinksGeneratedThisStep.push(linkToAdd);
+            } else {
+                console.warn(`Parent node at index ${parentNodeIndex} is undefined for new node ${newNode.id}`);
+            }
         });
       } else if (targetOrder > 1 && parentNodesForLinking.length === 0) {
         console.warn(`Cannot link order ${targetOrder} impacts as parentNodesForLinking is empty.`);
@@ -328,7 +375,7 @@ export default function CascadeExplorerPage() {
       causalReasoning: undefined,
       properties: {
         fullAssertionText: currentAssertionText,
-        systemModel: reflectionResult.systemModel,
+        systemModel: reflectionResult.systemModel, // This will be the (potentially revised) system model
         keyConcepts: reflectionResult.keyConcepts || [],
       }
     };
@@ -690,10 +737,8 @@ export default function CascadeExplorerPage() {
     const currentNodes = allImpactNodes;
 
     if (uiStep === ExplorerStep.INITIAL && !reflectionResult) return [];
-    if (uiStep === ExplorerStep.REFLECTION_PENDING) return [];
+    if (uiStep === ExplorerStep.REFLECTION_PENDING || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL) return [];
     if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) {
-      // For reflection review, we only want the core assertion node for the main graph
-      // The system model graph will be its own separate visualization
       return currentNodes.filter(n => n.order === 0);
     }
 
@@ -786,18 +831,20 @@ export default function CascadeExplorerPage() {
         );
       case ExplorerStep.REFLECTION_PENDING:
         return commonLoading("Reflecting on your input...");
+      case ExplorerStep.REVISING_SYSTEM_MODEL:
+        return commonLoading("AI is revising the system model based on your feedback...");
       case ExplorerStep.REFLECTION_REVIEW:
         if (!reflectionResult) return commonLoading("Loading reflection...");
         return (
           <Card className="shadow-xl bg-card">
             <CardHeader>
                 <CardTitle className="text-2xl text-primary">Step 2: Confirm Understanding</CardTitle>
-                <CardDescription>Review the AI's interpretation and the extracted system model.</CardDescription>
+                <CardDescription>Review the AI's interpretation and the extracted system model. You can suggest revisions or proceed.</CardDescription>
             </CardHeader>
             <CardContent>
               <ReflectionDisplay
                 reflection={reflectionResult}
-                showSystemModelDetails={reflectionViewMode === 'list'} // Control visibility
+                showSystemModelDetails={reflectionViewMode === 'list'}
               />
               <Tabs value={reflectionViewMode} onValueChange={(value) => setReflectionViewMode(value as 'list' | 'graph')} className="w-full mt-4 mb-2">
                 <TabsList className="grid w-full grid-cols-2">
@@ -818,13 +865,21 @@ export default function CascadeExplorerPage() {
             </CardContent>
             <CardFooter className="flex-col items-stretch gap-4">
                  <p className="text-sm text-muted-foreground italic">{reflectionResult.confirmationQuestion}</p>
+                 <Button 
+                    onClick={() => setIsSystemModelFeedbackDialogOpen(true)} 
+                    variant="outline"
+                    disabled={isLoading || uiStep === ExplorerStep.ORDER_1_PENDING || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL} 
+                    className="w-full"
+                  >
+                    <MessageSquareText className="mr-2 h-4 w-4" /> Suggest Revisions to System Model (via AI)
+                  </Button>
                 <Button 
                     onClick={handleConfirmReflectionAndFetchFirstOrder} 
-                    disabled={isLoading || uiStep === ExplorerStep.ORDER_1_PENDING} 
+                    disabled={isLoading || uiStep === ExplorerStep.ORDER_1_PENDING || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL} 
                     className="w-full bg-primary text-primary-foreground"
                 >
-                    {isLoading || uiStep === ExplorerStep.ORDER_1_PENDING ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                    Correct. Generate 1st Order Impacts
+                    {isLoading && uiStep !== ExplorerStep.REVISING_SYSTEM_MODEL ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Looks Good! Generate 1st Order Impacts
                 </Button>
             </CardFooter>
           </Card>
@@ -927,20 +982,17 @@ export default function CascadeExplorerPage() {
   };
 
   const getGraphTitle = () => {
-    if (uiStep === ExplorerStep.INITIAL || uiStep === ExplorerStep.REFLECTION_PENDING) return "Define Your Assertion";
-    // For REFLECTION_REVIEW, the main "Impact Network" graph isn't shown yet,
-    // as it only contains the core node. The System Model graph is handled separately.
+    if (uiStep === ExplorerStep.INITIAL || uiStep === ExplorerStep.REFLECTION_PENDING || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL) return "Define Your Assertion";
     if (uiStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Core Assertion Awaiting Impact Generation";
 
 
-    if (visibleNodes.length > 0 && (uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_REVIEW)) {
+    if (visibleNodes.length > 0 && (uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_REVIEW && uiStep !== ExplorerStep.REVISING_SYSTEM_MODEL)) {
         if (uiStep === ExplorerStep.ORDER_1_PENDING || uiStep === ExplorerStep.ORDER_1_REVIEW) return "Impact Network (1st Order)";
         if (uiStep === ExplorerStep.ORDER_2_PENDING || uiStep === ExplorerStep.ORDER_2_REVIEW) return "Impact Network (Up to 2nd Order)";
         if (uiStep === ExplorerStep.ORDER_3_PENDING || uiStep === ExplorerStep.ORDER_3_REVIEW) return "Impact Network (Up to 3rd Order)";
         if (uiStep === ExplorerStep.GENERATING_SUMMARY) return "Impact Network (Full Map - Generating Summary)";
         if (uiStep === ExplorerStep.FINAL_REVIEW || (uiStep === ExplorerStep.CONSOLIDATION_PENDING && visibleNodes.length > 0)) return "Impact Network (Full Map)";
     }
-     // Fallback if no other condition met but nodes exist (e.g., after reflection review before 1st order loads)
     if (reflectionResult && allImpactNodes.some(n => n.order === 0)) return "Core Assertion Awaiting Impact Generation";
     return "Impact Network";
   };
@@ -948,10 +1000,10 @@ export default function CascadeExplorerPage() {
   const getGraphDescription = () => {
     const currentStep = uiStep;
 
-    if (currentStep === ExplorerStep.INITIAL || currentStep === ExplorerStep.REFLECTION_PENDING ) return "Enter your input to begin exploring its cascading impacts.";
+    if (currentStep === ExplorerStep.INITIAL || currentStep === ExplorerStep.REFLECTION_PENDING || currentStep === ExplorerStep.REVISING_SYSTEM_MODEL) return "Enter your input to begin exploring its cascading impacts.";
     if (currentStep === ExplorerStep.REFLECTION_REVIEW && reflectionResult) return "Review the AI's understanding above. The main impact graph will build once you proceed.";
 
-    if (visibleNodes.length > 0 && (currentStep !== ExplorerStep.REFLECTION_PENDING && currentStep !== ExplorerStep.INITIAL && currentStep !== ExplorerStep.REFLECTION_REVIEW)) {
+    if (visibleNodes.length > 0 && (currentStep !== ExplorerStep.REFLECTION_PENDING && currentStep !== ExplorerStep.INITIAL && currentStep !== ExplorerStep.REFLECTION_REVIEW && currentStep !== ExplorerStep.REVISING_SYSTEM_MODEL)) {
         let orderText = 'all visible';
         if (currentStep === ExplorerStep.ORDER_1_REVIEW || currentStep === ExplorerStep.ORDER_1_PENDING) {
             orderText = 'displaying 1st order';
@@ -967,7 +1019,7 @@ export default function CascadeExplorerPage() {
     if (reflectionResult && allImpactNodes.some(n => n.order === 0)) return "The main impact graph will build once you generate first-order impacts.";
 
 
-    const earlyLoadingSteps = [ExplorerStep.REFLECTION_PENDING, ExplorerStep.ORDER_1_PENDING, ExplorerStep.ORDER_2_PENDING, ExplorerStep.ORDER_3_PENDING, ExplorerStep.CONSOLIDATION_PENDING, ExplorerStep.GENERATING_SUMMARY];
+    const earlyLoadingSteps = [ExplorerStep.REFLECTION_PENDING, ExplorerStep.REVISING_SYSTEM_MODEL, ExplorerStep.ORDER_1_PENDING, ExplorerStep.ORDER_2_PENDING, ExplorerStep.ORDER_3_PENDING, ExplorerStep.CONSOLIDATION_PENDING, ExplorerStep.GENERATING_SUMMARY];
     if (earlyLoadingSteps.includes(currentStep)) {
       return `Processing... Current step: ${ExplorerStep[currentStep] || currentStep}`;
     }
@@ -988,8 +1040,7 @@ export default function CascadeExplorerPage() {
       <main className="flex-grow flex flex-col gap-6">
         {renderStepContent()}
 
-        {/* Only show main impact network graph AFTER reflection review step */}
-        {visibleNodes.length > 0 && uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.REFLECTION_REVIEW && (
+        {visibleNodes.length > 0 && uiStep !== ExplorerStep.INITIAL && uiStep !== ExplorerStep.REFLECTION_PENDING && uiStep !== ExplorerStep.REFLECTION_REVIEW && uiStep !== ExplorerStep.REVISING_SYSTEM_MODEL && (
           <Card className="shadow-xl bg-card flex-grow flex flex-col min-h-[600px] mt-6">
             <CardHeader>
               <CardTitle className="text-2xl text-primary flex items-center">
@@ -1006,6 +1057,16 @@ export default function CascadeExplorerPage() {
           </Card>
         )}
       </main>
+
+      {reflectionResult && (
+        <SystemModelFeedbackDialog
+            isOpen={isSystemModelFeedbackDialogOpen}
+            onClose={() => setIsSystemModelFeedbackDialogOpen(false)}
+            currentSystemModel={reflectionResult.systemModel}
+            currentReflection={reflectionResult}
+            onRevisionSubmit={handleSystemModelRevisionSubmit}
+        />
+      )}
 
       <NodeDetailPanel
         node={selectedNode}
