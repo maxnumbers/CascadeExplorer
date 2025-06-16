@@ -127,7 +127,7 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
   async (input: GeneratePhaseConsequencesInput): Promise<GeneratePhaseConsequencesOutput> => {
     if ((input.targetPhase === '2' || input.targetPhase === '3') && (!input.parentImpacts || input.parentImpacts.length === 0)) {
       console.warn(`generatePhaseConsequencesFlow called for phase ${input.targetPhase} without parentImpacts. Returning empty.`);
-      return { generatedImpacts: [], updatedSystemQualitativeStates: {}, feedbackLoopInsights: [] };
+      return { generatedImpacts: [], feedbackLoopInsights: [] }; // updatedSystemQualitativeStates omitted
     }
 
     // Prepare the input for the prompt, including boolean flags for phase
@@ -140,26 +140,46 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
 
     const result = await phasePrompt(promptInputForAI);
 
-    if (!result || !result.output) { // Check for output object presence first
+    if (!result || !result.output) { 
       console.error('Generate phase consequences prompt did not return an output object.', result);
       return { 
         generatedImpacts: [], 
         // Return current states as a fallback, AI might have just failed to produce output
-        updatedSystemQualitativeStates: input.currentSystemQualitativeStates, 
+        // updatedSystemQualitativeStates: input.currentSystemQualitativeStates, // Omit as per new strategy
         feedbackLoopInsights: [] 
       };
     }
     
-    // Now check specific fields within output, allowing for updatedSystemQualitativeStates to be optional
     if (!result.output.generatedImpacts) {
         console.warn('Generate phase consequences prompt output is missing generatedImpacts. Assuming empty.', result.output);
     }
     
+    let validatedUpdatedStates: Record<string, string> | undefined = undefined;
+    if (result.output.updatedSystemQualitativeStates) {
+      if (typeof result.output.updatedSystemQualitativeStates === 'object' &&
+          !Array.isArray(result.output.updatedSystemQualitativeStates) &&
+          result.output.updatedSystemQualitativeStates !== null) {
+        
+        let isValidMap = true;
+        for (const key in result.output.updatedSystemQualitativeStates) {
+          if (typeof result.output.updatedSystemQualitativeStates[key] !== 'string') {
+            isValidMap = false;
+            break;
+          }
+        }
+        if (isValidMap) {
+          validatedUpdatedStates = result.output.updatedSystemQualitativeStates as Record<string, string>;
+        } else {
+          console.warn('AI provided updatedSystemQualitativeStates but it was not a Record<string, string>. Ignoring.', result.output.updatedSystemQualitativeStates);
+        }
+      } else {
+        console.warn('AI provided updatedSystemQualitativeStates but it was not an object. Ignoring.', result.output.updatedSystemQualitativeStates);
+      }
+    }
+    
     const output: GeneratePhaseConsequencesOutput = {
         generatedImpacts: result.output.generatedImpacts || [],
-        // If updatedSystemQualitativeStates is not present in AI output, it will be undefined here.
-        // The client-side code (page.tsx) handles merging this (or an empty object if undefined) into its state.
-        updatedSystemQualitativeStates: result.output.updatedSystemQualitativeStates, 
+        updatedSystemQualitativeStates: validatedUpdatedStates, 
         feedbackLoopInsights: result.output.feedbackLoopInsights || [],
     };
     
@@ -175,5 +195,3 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
     return output;
   }
 );
-
-    

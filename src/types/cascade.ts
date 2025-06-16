@@ -180,16 +180,17 @@ export type InferInitialQualitativeStateOutput = z.infer<typeof InferInitialQual
 // It has fields: assertionText, targetPhase, parentImpacts?, currentSystemQualitativeStates, tensionAnalysis?, systemModel
 export type AIGenerateImpactsByOrderInput = {
   assertionText: string;
-  targetPhase: '1' | '2' | '3'; // Explicit TS type
-  parentImpacts?: Impact[]; // Explicit TS type
-  currentSystemQualitativeStates: Record<string, string>; // Explicit TS type
-  tensionAnalysis?: TensionAnalysisOutput; // Explicit TS type
-  systemModel: SystemModel; // Explicit TS type
+  targetPhase: '1' | '2' | '3';
+  parentImpacts?: Impact[];
+  currentSystemQualitativeStates: Record<string, string>;
+  tensionAnalysis?: TensionAnalysisOutput;
+  systemModel: SystemModel;
 };
+
 
 export const GeneratePhaseConsequencesOutputSchema = z.object({
     generatedImpacts: z.array(ImpactSchema),
-    updatedSystemQualitativeStates: z.record(z.string()).optional().describe("The new qualitative states of stocks after these impacts."),
+    updatedSystemQualitativeStates: z.any().optional().describe("An object mapping changed stock names to their new qualitative states (e.g., {\"StockA\": \"Improved\", \"StockB\": \"Declining\"}). Omit this field entirely if NO stock states are changed by any impact generated in this call."),
     feedbackLoopInsights: z.array(z.string()).optional().describe("Brief descriptions of any feedback loops identified or significantly affected by these impacts.")
 });
 export type GeneratePhaseConsequencesOutput = z.infer<typeof GeneratePhaseConsequencesOutputSchema>;
