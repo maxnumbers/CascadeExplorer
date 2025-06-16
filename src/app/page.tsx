@@ -6,7 +6,7 @@ import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
 import { reflectAssertion, type AIReflectAssertionOutput } from '@/ai/flows/assertion-reflection';
 import { inferInitialQualitativeStates, type InferInitialQualitativeStateInput, type InferInitialQualitativeStateOutput } from '@/ai/flows/infer-initial-qualitative-state';
 import { identifyTensions, type TensionAnalysisInput, type TensionAnalysisOutput } from '@/ai/flows/tension-identification';
-import { generateImpactsByOrder, type GeneratePhaseConsequencesInput, type GeneratePhaseConsequencesOutput } from '@/ai/flows/generate-impacts-by-order'; // Aliased for clarity
+import { generateImpactsByOrder, type AIGenerateImpactsByOrderInput, type GeneratePhaseConsequencesOutput } from '@/ai/flows/generate-impacts-by-order';
 import { suggestImpactConsolidation, type SuggestImpactConsolidationOutput, type ConsolidatedImpactSuggestion } from '@/ai/flows/suggest-impact-consolidation';
 import { generateCascadeSummary, type CascadeSummaryInput, type CascadeSummaryOutput } from '@/ai/flows/generate-cascade-summary';
 import { reviseSystemModelWithFeedback, type ReviseSystemModelInput, type ReviseSystemModelOutput } from '@/ai/flows/revise-system-model-with-feedback';
@@ -21,8 +21,10 @@ import { NodeDetailPanel } from '@/components/cascade-explorer/NodeDetailPanel';
 import { ConsolidationSuggestionsDisplay } from '@/components/cascade-explorer/ConsolidationSuggestionsDisplay';
 import { SystemModelFeedbackDialog } from '@/components/cascade-explorer/SystemModelFeedbackDialog';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info } from 'lucide-react';
+import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info, Settings2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -86,6 +88,8 @@ export default function CascadeExplorerPage() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState<boolean>(false);
   const [reflectionViewMode, setReflectionViewMode] = useState<'list' | 'graph'>('list');
   const [isSystemModelFeedbackDialogOpen, setIsSystemModelFeedbackDialogOpen] = useState<boolean>(false);
+  const [advancedViewEnabled, setAdvancedViewEnabled] = useState<boolean>(false);
+
 
   const allImpactNodesRef = useRef(allImpactNodes);
   useEffect(() => {
@@ -127,6 +131,7 @@ export default function CascadeExplorerPage() {
     setIsGeneratingSummary(false);
     setReflectionViewMode('list');
     setIsSystemModelFeedbackDialogOpen(false);
+    // setAdvancedViewEnabled(false); // Optionally reset this too
     setCurrentGoalType(goalOptions[3].id);
     setUiStep(ExplorerStep.INITIAL);
   }
@@ -215,7 +220,7 @@ export default function CascadeExplorerPage() {
   const handleIdentifyTensions = useCallback(async (
     currentReflection: AIReflectAssertionOutput | null,
     assertionText: string,
-    systemQualitativeStates: Record<string, string> | null // Though not directly used in tensionInput, its presence signals correct flow
+    systemQualitativeStates: Record<string, string> | null
   ) => {
     if (!currentReflection || !assertionText || !currentReflection.systemModel || !systemQualitativeStates) {
         toast({ title: "Missing Context", description: "Cannot identify tensions without confirmed assertion, system model with states.", variant: "destructive" });
@@ -272,6 +277,7 @@ export default function CascadeExplorerPage() {
         });
         setCurrentSystemQualitativeStates(initialStates);
         
+        // Pass the newly inferred states directly to handleIdentifyTensions
         await handleIdentifyTensions(updatedReflectionResultWithStates, currentAssertionText, initialStates);
 
     } catch (error: any) {
@@ -333,7 +339,7 @@ export default function CascadeExplorerPage() {
     setConsolidationSuggestions(null);
 
     try {
-      const aiInput: GeneratePhaseConsequencesInput = {
+      const aiInput: AIGenerateImpactsByOrderInput = {
         assertionText: reflectionResult.summary, 
         targetPhase: targetPhase,
         parentImpacts: targetPhase > '1' ? parentNodesForLinking.map(mapImpactNodeToImpact) : undefined,
@@ -473,7 +479,7 @@ export default function CascadeExplorerPage() {
       parentId: undefined,
       properties: {
         fullAssertionText: currentAssertionText,
-        systemModel: reflectionResult.systemModel, 
+        systemModel: reflectionResult.systemModel, // This model includes initial qualitative states
         keyConcepts: reflectionResult.keyConcepts || [],
         tensionAnalysis: tensionAnalysisResult,
         initialSystemStatesSummary: initialSystemStatesSummary,
@@ -919,12 +925,25 @@ export default function CascadeExplorerPage() {
 
   return (
     <div className="min-h-screen flex flex-col p-4 md:p-8 bg-background text-foreground">
-      <header className="mb-8 text-center">
+      <header className="mb-6 text-center">
         <h1 className="text-4xl font-bold text-primary flex items-center justify-center">
           <Zap className="w-10 h-10 mr-3 text-accent" /> Cascade Explorer
         </h1>
         <p className="text-muted-foreground mt-2">Tool for qualitative systems modeling of ideas and decisions.</p>
       </header>
+
+      <div className="flex items-center space-x-2 self-center my-2">
+          <Switch
+            id="advanced-view-toggle"
+            checked={advancedViewEnabled}
+            onCheckedChange={setAdvancedViewEnabled}
+            aria-label="Toggle Advanced System Details"
+          />
+          <Label htmlFor="advanced-view-toggle" className="text-sm font-medium text-muted-foreground cursor-pointer flex items-center gap-1">
+            <Settings2 className="w-3.5 h-3.5" /> Show Advanced System Details
+          </Label>
+      </div>
+
 
       <main className="flex-grow flex flex-col gap-6">
         {renderStepContent()}
@@ -950,10 +969,14 @@ export default function CascadeExplorerPage() {
         />
       )}
 
-      <NodeDetailPanel node={selectedNode} isOpen={isNodePanelOpen} onClose={() => setIsNodePanelOpen(false)} onUpdateValidity={handleUpdateValidity} />
+      <NodeDetailPanel 
+        node={selectedNode} 
+        isOpen={isNodePanelOpen} 
+        onClose={() => setIsNodePanelOpen(false)} 
+        onUpdateValidity={handleUpdateValidity} 
+        advancedViewEnabled={advancedViewEnabled}
+      />
       <footer className="mt-12 text-center text-sm text-muted-foreground"><p>&copy; {new Date().getFullYear()} Cascade Explorer. Powered by Firebase Studio &amp; Genkit.</p></footer>
     </div>
   );
 }
-
-    
