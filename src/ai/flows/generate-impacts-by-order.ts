@@ -89,7 +89,7 @@ We are generating consequences for:
   Number of distinct consequences to generate per parent: 1-2.
 {{/if}}
 
-For each consequence you generate:
+For each consequence you generate (to be included in the 'generatedImpacts' array):
 1.  **Impact Definition**:
     *   Assign a unique \`id\` (e.g., impact-{{targetPhase}}-{index}).
     *   Provide a concise \`label\` (2-3 lines max).
@@ -98,15 +98,20 @@ For each consequence you generate:
     *   Include \`keyConcepts\` (2-4, name/type objects) and \`attributes\` (1-2 strings).
     *   Provide clear \`causalReasoning\` linking to its parent, system state, and tensions.
     *   **CRITICAL for Phase 2 & 3**: Include the \`parentId\` field, specifying the ID of the specific impact from the preceding phase.
-2.  **System State Evolution (\`updatedSystemQualitativeStates\`)**:
-    *   Based on THIS consequence, determine how the qualitative state of one or more key stocks in the \`systemModel\` would change.
-    *   Output these changes as a JSON object mapping stock names to their new qualitative states (e.g., {"Employee Trust": "Improved", "Market Share": "Declining"}). Only include stocks whose states *change* due to this specific impact. If no states change, this can be empty for this impact's contribution.
+2.  **Individual Impact's Effect on System State**:
+    *   Based on THIS specific consequence, determine how the qualitative state of one or more key stocks in the \`systemModel\` would change.
+    *   Document these changes internally for your aggregation step. (You will provide a cumulative \`updatedSystemQualitativeStates\` object later, or omit it if no states change overall).
 3.  **Feedback Loop Identification (\`feedbackLoopInsights\`)**:
     *   Does this consequence, or the state changes it causes, create or significantly influence a feedback loop (reinforcing or balancing) that affects earlier conditions or other parts of the system?
     *   If yes, provide a brief (1-2 sentence) insight describing this feedback loop (e.g., "This decline in 'Public Trust' could reinforce 'Regulatory Scrutiny', creating a negative spiral." or "Improved 'Product Quality' positively feeds back to 'Customer Satisfaction', driving growth."). This will be collected into an array.
 
+Output Structure:
 Return all generated impacts in the 'generatedImpacts' array.
-Return the *cumulative* new qualitative states from ALL impacts generated in THIS call in the 'updatedSystemQualitativeStates' object (if generating multiple impacts per call, aggregate their state changes).
+
+For the 'updatedSystemQualitativeStates' field in your final JSON output:
+- If one or more impacts generated in this call cause a change in the qualitative state of any system stock, this field MUST be an object. This object should map the names of *all changed stocks* to their new qualitative states (e.g., {\"StockA\": \"Improved\", \"StockB\": \"Declining\"}), including only stocks whose states changed.
+- **If NO stock states are changed by any impact generated in this call, you MUST OMIT the \`updatedSystemQualitativeStates\` field entirely from your JSON output.**
+
 Return ALL identified feedback loop insights from ALL impacts generated in THIS call in the 'feedbackLoopInsights' array.
 
 Ensure all generated impacts remain directly relevant to the overall assertion's domain.
@@ -135,20 +140,26 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
 
     const result = await phasePrompt(promptInputForAI);
 
-    if (!result || !result.output || !result.output.generatedImpacts) {
-      console.error('Generate phase consequences prompt did not return the expected output structure (missing generatedImpacts).', result);
-      // Fallback for safety
+    if (!result || !result.output) { // Check for output object presence first
+      console.error('Generate phase consequences prompt did not return an output object.', result);
       return { 
         generatedImpacts: [], 
-        updatedSystemQualitativeStates: input.currentSystemQualitativeStates, // return current states if AI fails
+        // Return current states as a fallback, AI might have just failed to produce output
+        updatedSystemQualitativeStates: input.currentSystemQualitativeStates, 
         feedbackLoopInsights: [] 
       };
     }
     
-    // Ensure all parts of the schema are present, even if empty from AI
+    // Now check specific fields within output, allowing for updatedSystemQualitativeStates to be optional
+    if (!result.output.generatedImpacts) {
+        console.warn('Generate phase consequences prompt output is missing generatedImpacts. Assuming empty.', result.output);
+    }
+    
     const output: GeneratePhaseConsequencesOutput = {
         generatedImpacts: result.output.generatedImpacts || [],
-        updatedSystemQualitativeStates: result.output.updatedSystemQualitativeStates || {},
+        // If updatedSystemQualitativeStates is not present in AI output, it will be undefined here.
+        // The client-side code (page.tsx) handles merging this (or an empty object if undefined) into its state.
+        updatedSystemQualitativeStates: result.output.updatedSystemQualitativeStates, 
         feedbackLoopInsights: result.output.feedbackLoopInsights || [],
     };
     
@@ -157,7 +168,6 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
         output.generatedImpacts.forEach(impact => {
             if (!impact.parentId) {
                 console.warn(`Impact "${impact.label}" in phase ${input.targetPhase} is missing a parentId.`);
-                // Optionally, could try to assign a fallback parentId here if critical
             }
         });
     }
