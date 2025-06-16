@@ -215,7 +215,7 @@ export default function CascadeExplorerPage() {
 
     try {
       const aiInput: GenerateImpactsByOrderInput = {
-        assertionText: reflectionResult.summary, // Use the AI's summary of the possibly revised assertion/system model
+        assertionText: reflectionResult.summary, 
         targetOrder: String(targetOrder) as '1' | '2' | '3',
         parentImpacts: targetOrder > 1 ? parentNodesForLinking.map(mapImpactNodeToImpact) : undefined,
       };
@@ -229,27 +229,36 @@ export default function CascadeExplorerPage() {
                                  impact.description && impact.description.trim() !== "" &&
                                  impact.validity &&
                                  impact.reasoning && impact.reasoning.trim() !== "";
-        return hasEssentialFields;
+        // For order > 1, parentId is also essential for linking (though AI might sometimes fail)
+        const parentIdCheck = targetOrder === 1 || (impact.parentId && impact.parentId.trim() !== "");
+        return hasEssentialFields && parentIdCheck;
       });
 
       if (validGeneratedImpacts.length < rawGeneratedImpacts.length) {
         const diff = rawGeneratedImpacts.length - validGeneratedImpacts.length;
-        console.warn(`Filtered out ${diff} malformed impact(s) from AI generation due to missing essential fields. Raw:`, rawGeneratedImpacts.filter(i => !validGeneratedImpacts.includes(i)));
+        const exampleMissingParentId = targetOrder > 1 ? rawGeneratedImpacts.find(imp => !imp.parentId) : null;
+        let detail = `${diff} impact(s) from AI were incomplete and ignored.`;
+        if(exampleMissingParentId){
+           detail += ` Example: Impact "${exampleMissingParentId.label}" missing parentId.`;
+        }
+        console.warn(`Filtered out ${diff} malformed impact(s). Raw:`, rawGeneratedImpacts.filter(i => !validGeneratedImpacts.includes(i)));
         toast({
           title: "AI Data Inconsistency",
-          description: `${diff} impact(s) from AI were incomplete (missing essential fields) and have been ignored.`,
+          description: detail,
           variant: "default",
-          duration: 7000,
+          duration: 8000,
         });
       }
-
+      
+      // Map AI impacts (Impact type) to ImpactNode type for UI/graph state
+      // CRITICAL: Ensure impact.parentId from AI is correctly mapped
       const newNodesFromAI: ImpactNode[] = validGeneratedImpacts.map(impact => ({
         id: impact.id,
         label: impact.label,
         description: impact.description,
         validity: impact.validity,
         reasoning: impact.reasoning,
-        parentId: undefined,
+        parentId: impact.parentId, // Use parentId from AI's ImpactSchema output
         keyConcepts: impact.keyConcepts || [],
         attributes: impact.attributes || [],
         causalReasoning: impact.causalReasoning,
@@ -259,13 +268,14 @@ export default function CascadeExplorerPage() {
             keyConcepts: impact.keyConcepts || [],
             attributes: impact.attributes || [],
         },
+        // x, y, vx, vy will be undefined here, d3 simulation handles initial placement
       }));
 
 
       if (newNodesFromAI.length === 0 && rawGeneratedImpacts.length > 0) {
          toast({
           title: `No Valid Impacts Processed`,
-          description: `The AI generated ${rawGeneratedImpacts.length} impact(s), but none passed validation (missing essential fields). Please try again or refine the assertion if this persists.`,
+          description: `The AI generated ${rawGeneratedImpacts.length} impact(s), but none passed validation. Please try again or refine the assertion if this persists.`,
           variant: "destructive",
           duration: 8000,
         });
@@ -277,68 +287,78 @@ export default function CascadeExplorerPage() {
           duration: 7000,
         });
       }
-
-      setAllImpactNodes(prevNodes => {
-        const currentNodes = allImpactNodesRef.current;
-        const nodeMap = new Map(currentNodes.map(n => [n.id, n]));
-        newNodesFromAI.forEach(n => nodeMap.set(n.id, n));
-        return Array.from(nodeMap.values());
-      });
-
+      
       const newLinksGeneratedThisStep: ImpactLink[] = [];
+      const finalNewNodesWithUpdatedParentIds: ImpactNode[] = [];
 
       if (targetOrder === 1) {
           const coreNodeForLinking = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
           if (coreNodeForLinking) {
               newNodesFromAI.forEach(newNode => {
-                  newNode.parentId = CORE_ASSERTION_ID;
-                  newLinksGeneratedThisStep.push({ source: coreNodeForLinking.id, target: newNode.id });
+                  // For 1st order, parentId is always CORE_ASSERTION_ID
+                  const nodeWithParent = { ...newNode, parentId: CORE_ASSERTION_ID };
+                  finalNewNodesWithUpdatedParentIds.push(nodeWithParent);
+                  newLinksGeneratedThisStep.push({ source: CORE_ASSERTION_ID, target: nodeWithParent.id });
               });
           } else {
                console.error("Core assertion node not found for linking 1st order impacts. allImpactNodesRef.current IDs:", allImpactNodesRef.current.map(n => n.id));
           }
-      } else if (targetOrder > 1 && parentNodesForLinking.length > 0) {
-        newNodesFromAI.forEach((newNode, index) => {
-            // Ensure parentNode exists before trying to access its id
-            const parentNodeIndex = index % parentNodesForLinking.length;
-            if (parentNodesForLinking[parentNodeIndex]) {
-                const parentNode = parentNodesForLinking[parentNodeIndex];
-                newNode.parentId = parentNode.id;
-                const linkToAdd = { source: parentNode.id, target: newNode.id };
-                newLinksGeneratedThisStep.push(linkToAdd);
+      } else if (targetOrder > 1) { 
+        newNodesFromAI.forEach(newNode => {
+            const aiParentId = newNode.parentId; // This should be set from AI's output now
+            const parentNodeFromGraph = allImpactNodesRef.current.find(n => n.id === aiParentId && n.order === targetOrder - 1);
+
+            if (parentNodeFromGraph) {
+                // Parent found in current graph, link is good. newNode.parentId is already correct.
+                finalNewNodesWithUpdatedParentIds.push(newNode);
+                newLinksGeneratedThisStep.push({ source: parentNodeFromGraph.id, target: newNode.id });
             } else {
-                console.warn(`Parent node at index ${parentNodeIndex} is undefined for new node ${newNode.id}`);
+                console.warn(`Impact "${newNode.label}" (ID: ${newNode.id}) from AI for order ${targetOrder} specified parentId ('${aiParentId}') which is not a valid, existing node of order ${targetOrder - 1}. Attempting fallback.`);
+                if (parentNodesForLinking.length > 0) {
+                    // Fallback: use the first node from the list of parents sent to the AI
+                    const fallbackParent = parentNodesForLinking[0]; 
+                    const nodeWithFallbackParent = { ...newNode, parentId: fallbackParent.id }; // Update the node's parentId
+                    finalNewNodesWithUpdatedParentIds.push(nodeWithFallbackParent);
+                    newLinksGeneratedThisStep.push({ source: fallbackParent.id, target: nodeWithFallbackParent.id });
+                    toast({
+                        title: "Linking Fallback Applied",
+                        description: `Impact "${newNode.label}" used a fallback parent ("${fallbackParent.label}") because its AI-specified parent (ID: ${aiParentId}) was invalid or missing. The AI's reasoning text may still refer to the intended parent.`,
+                        variant: "default", duration: 10000,
+                    });
+                } else {
+                    finalNewNodesWithUpdatedParentIds.push(newNode); // Add node even if orphaned
+                    console.error(`CRITICAL: Orphaned Impact "${newNode.label}" (ID: ${newNode.id}). AI parentId ('${aiParentId}') invalid, and no fallback parents (parentNodesForLinking) exist. Will appear disconnected.`);
+                    toast({
+                        title: "Orphaned Impact Warning",
+                        description: `Impact "${newNode.label}" could not be linked to any parent node. It will appear disconnected. This may be due to an issue with AI output or consolidation.`,
+                        variant: "destructive", duration: 10000,
+                    });
+                }
             }
         });
-      } else if (targetOrder > 1 && parentNodesForLinking.length === 0) {
-        console.warn(`Cannot link order ${targetOrder} impacts as parentNodesForLinking is empty.`);
       }
+      
+      setAllImpactNodes(prevNodes => {
+        const nodeMap = new Map(prevNodes.map(n => [n.id, n]));
+        finalNewNodesWithUpdatedParentIds.forEach(updatedNode => {
+          nodeMap.set(updatedNode.id, updatedNode);
+        });
+        return Array.from(nodeMap.values());
+      });
 
       setGraphLinks(prevLinks => {
         const currentLinks = graphLinksRef.current;
         const linkMap = new Map(currentLinks.map(l => {
-            const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
-            const targetId = typeof l.target === 'string' ? l.target : l.target.id;
+            const sourceId = typeof l.source === 'string' ? l.source : (l.source as ImpactNode).id;
+            const targetId = typeof l.target === 'string' ? l.target : (l.target as ImpactNode).id;
             return [`${sourceId}:::${targetId}`, l];
         }));
         newLinksGeneratedThisStep.forEach(l => {
-            const sourceId = typeof l.source === 'string' ? l.source : l.source.id;
-            const targetId = typeof l.target === 'string' ? l.target : l.target.id;
+            const sourceId = typeof l.source === 'string' ? l.source : (l.source as ImpactNode).id;
+            const targetId = typeof l.target === 'string' ? l.target : (l.target as ImpactNode).id;
             linkMap.set(`${sourceId}:::${targetId}`, l);
         });
         return Array.from(linkMap.values());
-      });
-
-      setAllImpactNodes(prevNodes => {
-        const nodeMap = new Map(prevNodes.map(n => [n.id, n]));
-        newNodesFromAI.forEach(updatedNode => {
-          if (nodeMap.has(updatedNode.id)) {
-            nodeMap.set(updatedNode.id, { ...nodeMap.get(updatedNode.id)!, ...updatedNode });
-          } else {
-            nodeMap.set(updatedNode.id, updatedNode);
-          }
-        });
-        return Array.from(nodeMap.values());
       });
 
       setUiStep(currentReviewStep);
@@ -373,18 +393,19 @@ export default function CascadeExplorerPage() {
       keyConcepts: reflectionResult.keyConcepts || [],
       attributes: [],
       causalReasoning: undefined,
+      parentId: undefined,
       properties: {
         fullAssertionText: currentAssertionText,
-        systemModel: reflectionResult.systemModel, // This will be the (potentially revised) system model
+        systemModel: reflectionResult.systemModel, 
         keyConcepts: reflectionResult.keyConcepts || [],
       }
     };
 
     setAllImpactNodes([coreNode]);
     setGraphLinks([]);
-    await Promise.resolve();
+    await Promise.resolve(); // Ensure state updates are processed before fetching
 
-    await fetchImpactsForOrder(1, [coreNode]);
+    await fetchImpactsForOrder(1, [coreNode]); // Pass coreNode as its own parent for linking logic
   }, [reflectionResult, currentAssertionText, fetchImpactsForOrder]);
 
 
@@ -1081,3 +1102,4 @@ export default function CascadeExplorerPage() {
     </div>
   );
 }
+

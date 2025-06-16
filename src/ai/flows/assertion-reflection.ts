@@ -50,14 +50,14 @@ Based on this assertion, you must:
 1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
 2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
 3.  **System Model ('systemModel')**: Analyze the assertion to identify components of a basic system model. This is crucial for understanding the underlying dynamics.
-    *   **Stocks**: Identify 3-5 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt'). For each stock, provide:
+    *   **Stocks**: Identify 3-10 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt'). For each stock, provide:
         *   'name': A concise name for the stock.
         *   'description' (optional): A brief explanation of what this stock represents.
-    *   **Agents**: Identify 3-5 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
+    *   **Agents**: Identify 3-10 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
         *   'name': A concise name for the agent.
         *   'description' (optional): A brief explanation of this agent's role or nature.
     *   **Incentives & Flows (Crucial for System Dynamics)**: This part requires careful, systematic thought.
-        *   **Initial Pass - Obvious Connections**: First, based on the stocks and agents you've identified, pinpoint the 2-3 most direct and primary incentives. For these, describe the agent's main motivation regarding a stock and the most likely resulting flow or action, all derived *explicitly* from the user's assertion.
+        *   **Initial Pass - Obvious Connections**: First, based on the stocks and agents you've identified, pinpoint the most direct and primary incentives. For these, describe the agent's main motivation regarding a stock and the most likely resulting flow or action, all derived *explicitly* from the user's assertion.
         *   **Review and Expansion Pass - Holistic System Mapping**:
             Now, critically review ALL stocks and ALL agents you've listed above. Your goal is to build a more complete map of interdependencies that are *still grounded in the user's assertion*.
             For EACH Agent previously identified:
