@@ -179,7 +179,20 @@ export default function CascadeExplorerPage() {
       };
       const result = await reviseSystemModelWithFeedback(input);
       if (result && result.revisedSystemModel) {
-        setReflectionResult(prev => prev ? { ...prev, systemModel: result.revisedSystemModel } : null);
+        // After revision, re-sync reflectionResult.systemModel
+        setReflectionResult(prev => {
+            if (!prev) return null;
+            const newSystemModel = result.revisedSystemModel;
+            // If currentSystemQualitativeStates exist, try to map them to the new/revised model
+            if (currentSystemQualitativeStates) {
+                const updatedStocksWithStates = newSystemModel.stocks.map(stock => {
+                    const existingState = currentSystemQualitativeStates[stock.name];
+                    return existingState ? { ...stock, qualitativeState: existingState } : stock;
+                });
+                return { ...prev, systemModel: { ...newSystemModel, stocks: updatedStocksWithStates }};
+            }
+            return { ...prev, systemModel: newSystemModel };
+        });
         toast({ title: "System Model Revised by AI", description: result.revisionSummary || "AI has revised the system model based on your feedback.", duration: 6000 });
       } else {
         toast({ title: "Revision Failed", description: result.revisionSummary || "AI could not revise the model as requested.", variant: "destructive", duration: 6000 });
@@ -217,14 +230,13 @@ export default function CascadeExplorerPage() {
     };
   }, []);
 
-  const handleIdentifyTensions = useCallback(async (
-    currentReflection: AIReflectAssertionOutput | null,
-    assertionText: string,
-    systemQualitativeStates: Record<string, string> | null
+ const handleIdentifyTensions = useCallback(async (
+    currentReflectionForTensions: AIReflectAssertionOutput, // Use a specifically named param
+    assertionTextForTensions: string
   ) => {
-    if (!currentReflection || !assertionText || !currentReflection.systemModel || !systemQualitativeStates) {
-        toast({ title: "Missing Context", description: "Cannot identify tensions without confirmed assertion, system model with states.", variant: "destructive" });
-        setUiStep(currentReflection?.systemModel ? ExplorerStep.INFERRING_INITIAL_STATE : ExplorerStep.REFLECTION_REVIEW);
+    if (!currentReflectionForTensions.systemModel) { // systemModel is now guaranteed by AIReflectAssertionOutput type, but good to check
+        toast({ title: "Missing System Model", description: "Cannot identify tensions without a system model.", variant: "destructive" });
+        setUiStep(ExplorerStep.REFLECTION_REVIEW);
         return;
     }
     setUiStep(ExplorerStep.TENSION_ANALYSIS_PENDING);
@@ -232,8 +244,8 @@ export default function CascadeExplorerPage() {
 
     try {
         const tensionInput: TensionAnalysisInput = {
-            assertionText: assertionText,
-            systemModel: currentReflection.systemModel, 
+            assertionText: assertionTextForTensions,
+            systemModel: currentReflectionForTensions.systemModel, // This model includes qualitative states
         };
         const result = await identifyTensions(tensionInput);
         setTensionAnalysisResult(result);
@@ -247,9 +259,10 @@ export default function CascadeExplorerPage() {
             errorMessage = `Tension Analysis Error: ${error.message}`;
         }
         toast({ title: "Error Identifying Tensions", description: errorMessage, variant: "destructive", duration: 7000 });
-        setUiStep(ExplorerStep.REFLECTION_REVIEW); 
+        setUiStep(ExplorerStep.INITIAL_STATE_REVIEW); 
     }
   }, [toast, setUiStep, setTensionAnalysisResult]);
+
 
   const handleConfirmReflectionAndInferInitialStates = useCallback(async () => {
     if (!reflectionResult || !currentAssertionText || !reflectionResult.systemModel) {
@@ -265,8 +278,12 @@ export default function CascadeExplorerPage() {
         };
         const stateInferenceResult = await inferInitialQualitativeStates(inferInput);
         
-        const updatedReflectionResultWithStates = reflectionResult ? { ...reflectionResult, systemModel: stateInferenceResult.systemModelWithQualitativeStates } : null;
-        setReflectionResult(updatedReflectionResultWithStates);
+        // Update reflectionResult with the system model that now includes qualitative states
+        const updatedReflectionWithStates = { 
+            ...reflectionResult, 
+            systemModel: stateInferenceResult.systemModelWithQualitativeStates 
+        };
+        setReflectionResult(updatedReflectionWithStates);
         setInitialSystemStatesSummary(stateInferenceResult.initialStatesSummary);
 
         const initialStates: Record<string, string> = {};
@@ -276,9 +293,10 @@ export default function CascadeExplorerPage() {
             }
         });
         setCurrentSystemQualitativeStates(initialStates);
+        setUiStep(ExplorerStep.INITIAL_STATE_REVIEW); // New step after inference
         
-        // Pass the newly inferred states directly to handleIdentifyTensions
-        await handleIdentifyTensions(updatedReflectionResultWithStates, currentAssertionText, initialStates);
+        // Pass the updated reflection (which contains the model with states) and current assertion text
+        await handleIdentifyTensions(updatedReflectionWithStates, currentAssertionText);
 
     } catch (error: any) {
         console.error("Error inferring initial qualitative states:", error);
@@ -301,9 +319,8 @@ export default function CascadeExplorerPage() {
     }
 
     const coreAssertionNode = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
-    const currentTensionAnalysisToUse = targetPhase === '1'
-        ? tensionAnalysisResult
-        : coreAssertionNode?.properties?.tensionAnalysis;
+    const currentTensionAnalysisToUse = tensionAnalysisResult || coreAssertionNode?.properties?.tensionAnalysis;
+
 
     if (targetPhase === '1' && !currentTensionAnalysisToUse) {
         toast({ title: "Missing Tension Analysis", description: "Tension analysis is required before generating Phase 1 consequences.", variant: "destructive" });
@@ -428,10 +445,20 @@ export default function CascadeExplorerPage() {
       });
 
       if (result.updatedSystemQualitativeStates) {
-        setCurrentSystemQualitativeStates(prevStates => ({
-            ...prevStates, 
+        const newQualitativeStates = {
+            ...(currentSystemQualitativeStates || {}), 
             ...result.updatedSystemQualitativeStates 
-        }));
+        };
+        setCurrentSystemQualitativeStates(newQualitativeStates);
+        // Update reflectionResult.systemModel.stocks with new qualitative states
+        setReflectionResult(prev => {
+            if (!prev || !prev.systemModel) return prev;
+            const updatedStocks = prev.systemModel.stocks.map(stock => ({
+                ...stock,
+                qualitativeState: newQualitativeStates[stock.name] || stock.qualitativeState,
+            }));
+            return { ...prev, systemModel: { ...prev.systemModel, stocks: updatedStocks }};
+        });
         console.log("[fetchImpactsForOrder] Updated System Qualitative States:", result.updatedSystemQualitativeStates);
       }
       if (result.feedbackLoopInsights && result.feedbackLoopInsights.length > 0) {
@@ -456,7 +483,7 @@ export default function CascadeExplorerPage() {
       else if (targetPhase === '3') setUiStep(ExplorerStep.ORDER_2_REVIEW);
       else setUiStep(ExplorerStep.INITIAL);
     }
-  }, [currentAssertionText, reflectionResult, tensionAnalysisResult, currentSystemQualitativeStates, mapImpactNodeToImpact, toast, allImpactNodesRef, graphLinksRef, setUiStep, setConsolidationSuggestions, setCurrentSystemQualitativeStates, setAllFeedbackLoopInsights, setAllImpactNodes, setGraphLinks]);
+  }, [currentAssertionText, reflectionResult, tensionAnalysisResult, currentSystemQualitativeStates, mapImpactNodeToImpact, toast, allImpactNodesRef, graphLinksRef, setUiStep, setConsolidationSuggestions, setCurrentSystemQualitativeStates, setAllFeedbackLoopInsights, setAllImpactNodes, setGraphLinks, setReflectionResult]);
 
 
   const handleProceedFromTensionAnalysisToFirstOrder = useCallback(async () => {
@@ -603,7 +630,10 @@ export default function CascadeExplorerPage() {
         if (originalNodes.length !== suggestion.originalImpactIds.length || originalNodes.length === 0) return false;
         const firstOriginalOrder = originalNodes[0].order;
         if (!originalNodes.every(node => node.order === firstOriginalOrder)) return false;
-        const consolidatedOrderString = suggestion.consolidatedImpact.order as string; 
+        // Ensure consolidatedImpact.order is a string '0', '1', '2', or '3' before parsing
+        const consolidatedOrderString = typeof suggestion.consolidatedImpact.order === 'number' 
+            ? String(suggestion.consolidatedImpact.order) 
+            : suggestion.consolidatedImpact.order as string;
         if (!consolidatedOrderString || !['0', '1', '2', '3'].includes(consolidatedOrderString)) return false;
         return parseInt(consolidatedOrderString, 10) === firstOriginalOrder;
       });
@@ -644,7 +674,11 @@ export default function CascadeExplorerPage() {
         toast({title: "Invalid Suggestion", description: "Cannot apply consolidation, suggestion is missing original impact IDs or has too few.", variant:"destructive"});
         return;
     }
-    const newConsolidatedImpactOrder = parseInt(suggestedConsolidatedImpact.order as string, 10) as 0 | 1 | 2 | 3;
+    const consolidatedOrderString = typeof suggestedConsolidatedImpact.order === 'number' 
+        ? String(suggestedConsolidatedImpact.order) 
+        : suggestedConsolidatedImpact.order as string;
+
+    const newConsolidatedImpactOrder = parseInt(consolidatedOrderString, 10) as 0 | 1 | 2 | 3;
     const newGraphNode: ImpactNode = {
         id: suggestedConsolidatedImpact.id,
         label: suggestedConsolidatedImpact.label,
@@ -784,19 +818,22 @@ export default function CascadeExplorerPage() {
       case ExplorerStep.INFERRING_INITIAL_STATE: return commonLoading("AI is inferring initial system states...");
       
       case ExplorerStep.REFLECTION_REVIEW: 
+      case ExplorerStep.INITIAL_STATE_REVIEW: // Added this case
         if (!reflectionResult) return commonLoading("Loading reflection...");
         const systemModelForDisplay = reflectionResult.systemModel; 
         const currentInitialStatesSummary = initialSystemStatesSummary; 
+        const stepTitle = uiStep === ExplorerStep.INITIAL_STATE_REVIEW ? "Step 2b: Review Initial System States" : "Step 2a: Confirm Understanding & System Model";
+        const stepDescription = uiStep === ExplorerStep.INITIAL_STATE_REVIEW ? "Review AI's inferred initial qualitative states for the system model. This sets the baseline." : "Review AI's interpretation and extracted system model. You can suggest revisions or proceed to state inference.";
 
         return (
           <Card className="shadow-xl bg-card">
             <CardHeader>
-                <CardTitle className="text-2xl text-primary">Step 2: Confirm Understanding & System Model</CardTitle>
-                <CardDescription>Review AI's interpretation and extracted system model. You can suggest revisions or proceed.</CardDescription>
+                <CardTitle className="text-2xl text-primary">{stepTitle}</CardTitle>
+                <CardDescription>{stepDescription}</CardDescription>
             </CardHeader>
             <CardContent>
               <ReflectionDisplay reflection={reflectionResult} showSystemModelDetails={reflectionViewMode === 'list'} />
-              {currentInitialStatesSummary && (
+              {currentInitialStatesSummary && (uiStep === ExplorerStep.INITIAL_STATE_REVIEW || uiStep === ExplorerStep.TENSION_ANALYSIS_REVIEW) && (
                 <Card className="mt-4 p-4 bg-accent/10 border-accent/30">
                   <CardTitle className="text-md text-accent flex items-center mb-1"><Info className="w-4 h-4 mr-2"/>AI's Summary of Initial System States:</CardTitle>
                   <p className="text-sm text-muted-foreground">{currentInitialStatesSummary}</p>
@@ -807,20 +844,31 @@ export default function CascadeExplorerPage() {
                   <TabsTrigger value="list"><List className="mr-2 h-4 w-4" />System List View</TabsTrigger>
                   <TabsTrigger value="graph"><Workflow className="mr-2 h-4 w-4" />System Graph View</TabsTrigger>
                 </TabsList>
+                 {reflectionViewMode === 'graph' && systemModelForDisplay && (
+                    <Card className="mt-0 shadow-md bg-card/50 border-input">
+                        <CardHeader><CardTitle className="text-lg text-accent">System Model Graph (with Qualitative States)</CardTitle></CardHeader>
+                        <CardContent className="min-h-[300px] md:min-h-[400px]">
+                            <SystemModelGraph systemModel={systemModelForDisplay} />
+                        </CardContent>
+                    </Card>
+                )}
               </Tabs>
-              {reflectionViewMode === 'graph' && systemModelForDisplay && (
-                <Card className="mt-0 shadow-md bg-card/50 border-input"><CardHeader><CardTitle className="text-lg text-accent">System Model Graph</CardTitle></CardHeader><CardContent className="min-h-[300px] md:min-h-[400px]"><SystemModelGraph systemModel={systemModelForDisplay} /></CardContent></Card>
-              )}
             </CardContent>
             <CardFooter className="flex-col items-stretch gap-4">
-                 <p className="text-sm text-muted-foreground italic">{reflectionResult.confirmationQuestion}</p>
-                 <Button onClick={() => setIsSystemModelFeedbackDialogOpen(true)} variant="outline" disabled={isLoading || uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING} className="w-full">
-                    <MessageSquareText className="mr-2 h-4 w-4" /> Suggest Revisions to System Model (AI)
-                  </Button>
-                <Button onClick={handleConfirmReflectionAndInferInitialStates} disabled={isLoading || uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING} className="w-full bg-primary text-primary-foreground">
-                    {(isLoading && (uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING)) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldAlert className="mr-2 h-4 w-4" />}
-                    Confirm & Analyze System (Tensions & States)
-                </Button>
+                {uiStep === ExplorerStep.REFLECTION_REVIEW && (
+                    <>
+                        <p className="text-sm text-muted-foreground italic">{reflectionResult.confirmationQuestion}</p>
+                        <Button onClick={() => setIsSystemModelFeedbackDialogOpen(true)} variant="outline" disabled={isLoading || uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING} className="w-full">
+                            <MessageSquareText className="mr-2 h-4 w-4" /> Suggest Revisions to System Model (AI)
+                        </Button>
+                        <Button onClick={handleConfirmReflectionAndInferInitialStates} disabled={isLoading || uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING} className="w-full bg-primary text-primary-foreground">
+                            {(isLoading && (uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING)) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />}
+                            Confirm & Infer Initial System States
+                        </Button>
+                    </>
+                )}
+                {/* Button to proceed from INITIAL_STATE_REVIEW to TENSION_ANALYSIS_PENDING would be here if handleIdentifyTensions wasn't auto-called. */}
+                {/* For now, INITIAL_STATE_REVIEW automatically proceeds to TENSION_ANALYSIS_PENDING via handleConfirmReflectionAndInferInitialStates->handleIdentifyTensions */}
             </CardFooter>
           </Card>
         );
@@ -897,13 +945,13 @@ export default function CascadeExplorerPage() {
         [ExplorerStep.GENERATING_SUMMARY]: "Impact Network (Full System Evolution - Generating Summary)",
         [ExplorerStep.FINAL_REVIEW]: "Impact Network (Full System Evolution)",
         [ExplorerStep.CONSOLIDATION_PENDING]: "Impact Network (Analyzing Consolidations)",
-        [ExplorerStep.INITIAL]: "Define Your Assertion",
-        [ExplorerStep.REFLECTION_PENDING]: "Reflecting...",
-        [ExplorerStep.REVISING_SYSTEM_MODEL]: "Revising Model...",
-        [ExplorerStep.INFERRING_INITIAL_STATE]: "Inferring States...",
-        [ExplorerStep.INITIAL_STATE_REVIEW]: "Initial State Review",
-        [ExplorerStep.TENSION_ANALYSIS_PENDING]: "Analyzing Tensions...",
-        [ExplorerStep.TENSION_ANALYSIS_REVIEW]: "Tension Review",
+        [ExplorerStep.INITIAL]: "Define Your Assertion", // Should not be reached if graph is visible
+        [ExplorerStep.REFLECTION_PENDING]: "Reflecting...", // Should not be reached if graph is visible
+        [ExplorerStep.REVISING_SYSTEM_MODEL]: "Revising Model...", // Should not be reached
+        [ExplorerStep.INFERRING_INITIAL_STATE]: "Inferring States...", // Should not be reached
+        [ExplorerStep.INITIAL_STATE_REVIEW]: "Impact Network (Review Initial State)", // Covered by earlier condition
+        [ExplorerStep.TENSION_ANALYSIS_PENDING]: "Analyzing Tensions...", // Should not be reached
+        [ExplorerStep.TENSION_ANALYSIS_REVIEW]: "Impact Network (Review Tensions)", // Covered by earlier condition
     };
     return phaseTextMap[uiStep] || "Impact Network";
   };
@@ -917,7 +965,7 @@ export default function CascadeExplorerPage() {
         [ExplorerStep.FINAL_REVIEW]: `${base} Displaying full system evolution.`,
     };
     if ([ExplorerStep.INITIAL, ExplorerStep.REFLECTION_PENDING, ExplorerStep.REVISING_SYSTEM_MODEL, ExplorerStep.INFERRING_INITIAL_STATE, ExplorerStep.TENSION_ANALYSIS_PENDING].includes(uiStep)) return "Enter your input to begin exploring.";
-    if (([ExplorerStep.REFLECTION_REVIEW, ExplorerStep.INITIAL_STATE_REVIEW, ExplorerStep.TENSION_ANALYSIS_REVIEW].includes(uiStep)) && reflectionResult) return "Review AI's understanding. Impact graph builds after generating consequences.";
+    if (([ExplorerStep.REFLECTION_REVIEW, ExplorerStep.INITIAL_STATE_REVIEW, ExplorerStep.TENSION_ANALYSIS_REVIEW].includes(uiStep)) && reflectionResult) return "Review AI's understanding. Impact graph builds after generating consequences. You can view the System Model via the tabs above.";
 
     return phaseDescMap[uiStep] || "Define assertion to start.";
   };
@@ -940,7 +988,7 @@ export default function CascadeExplorerPage() {
             aria-label="Toggle Advanced System Details"
           />
           <Label htmlFor="advanced-view-toggle" className="text-sm font-medium text-muted-foreground cursor-pointer flex items-center gap-1">
-            <Settings2 className="w-3.5 h-3.5" /> Show Advanced System Details
+            <Settings2 className="w-3.5 h-3.5" /> Show Advanced System Details (in Node Panel)
           </Label>
       </div>
 
@@ -980,3 +1028,4 @@ export default function CascadeExplorerPage() {
     </div>
   );
 }
+

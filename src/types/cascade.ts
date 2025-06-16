@@ -6,7 +6,7 @@ import type { ReflectAssertionOutput as AIReflectAssertionOutputOriginal } from 
 // Import types for the new generateImpactsByOrder flow
 // AIGenerateImpactsByOrderInputOriginal will be the TypeScript type z.infer<typeof GeneratePhaseConsequencesInputSchema>
 // AIGenerateImpactsByOrderOutputOriginal will be the TypeScript type z.infer<typeof GeneratePhaseConsequencesOutputSchema> (from this file itself)
-import type { GeneratePhaseConsequencesInput as AIGenerateImpactsByOrderInputOriginal } from '@/ai/flows/generate-impacts-by-order';
+// import type { GeneratePhaseConsequencesInput as AIGenerateImpactsByOrderInputOriginal } from '@/ai/flows/generate-impacts-by-order';
 
 
 export const StructuredConceptSchema = z.object({
@@ -201,11 +201,12 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
   nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT';
   properties: {
     fullAssertionText?: string;
-    systemModel?: SystemModel;
+    systemModel?: SystemModel; // This SystemModel should have stocks with up-to-date qualitativeStates
     keyConcepts?: StructuredConcept[];
     attributes?: string[];
     tensionAnalysis?: TensionAnalysisOutput;
     feedbackLoopInsights?: string[];
+    initialSystemStatesSummary?: string; // Added here for CORE_ASSERTION node
     [key: string]: any;
   };
   originalColor?: string;
@@ -256,4 +257,23 @@ export interface GoalOption {
   promptLabel: string;
   placeholder: string;
   icon?: React.ElementType;
+}
+
+// Specific types for SystemModelGraph
+export interface SystemGraphNode extends SimulationNodeDatum {
+  id: string; // Unique ID for D3 (e.g., "stock-Public Trust", "agent-Government")
+  originalId: string; // The actual name of the stock/agent
+  label: string;
+  type: 'stock' | 'agent';
+  description?: string;
+  qualitativeState?: string; // For stocks
+  baseColor: string;
+}
+
+export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
+  source: string; // ID of source SystemGraphNode
+  target: string; // ID of target SystemGraphNode
+  label: string;  // incentiveDescription or flowDescription
+  flow?: string;   // resultingFlow (for agent-stock) or drivingForce (for stock-stock)
+  type: 'incentive' | 'stock-to-stock';
 }
