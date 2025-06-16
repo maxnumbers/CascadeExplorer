@@ -4,7 +4,9 @@ import { z } from 'zod';
 // Import ReflectAssertionOutput type from its flow file
 import type { ReflectAssertionOutput as AIReflectAssertionOutputOriginal } from '@/ai/flows/assertion-reflection';
 // Import types for the new generateImpactsByOrder flow
-import type { GenerateImpactsByOrderInput as AIGenerateImpactsByOrderInputOriginal, GenerateImpactsByOrderOutput as AIGenerateImpactsByOrderOutputOriginal } from '@/ai/flows/generate-impacts-by-order';
+// AIGenerateImpactsByOrderInputOriginal will be the TypeScript type z.infer<typeof GeneratePhaseConsequencesInputSchema>
+// AIGenerateImpactsByOrderOutputOriginal will be the TypeScript type z.infer<typeof GeneratePhaseConsequencesOutputSchema> (from this file itself)
+import type { GeneratePhaseConsequencesInput as AIGenerateImpactsByOrderInputOriginal } from '@/ai/flows/generate-impacts-by-order';
 
 
 export const StructuredConceptSchema = z.object({
@@ -61,6 +63,7 @@ export const ImpactSchema = z.object({
   keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
   causalReasoning: z.string().optional().describe('Explanation of why this impact is a plausible consequence of its preceding impacts and current system state. For first-phase impacts, this explains their link to the initial assertion and state.'),
+  // 'order' field is added in ImpactNode, not in the base ImpactSchema for AI
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -138,7 +141,7 @@ export type IdentifiedTradeOff = z.infer<typeof IdentifiedTradeOffSchema>;
 
 export const TensionAnalysisInputSchema = z.object({
   assertionText: z.string().describe("The initial user assertion text."),
-  systemModel: SystemModelSchema.describe("The system model (stocks with their qualitative states, agents, incentives, stock-to-stock flows) generated from the assertion.") // SystemModel now includes qualitative states
+  systemModel: SystemModelSchema.describe("The system model (stocks with their qualitative states, agents, incentives, stock-to-stock flows) generated from the assertion.")
 });
 export type TensionAnalysisInput = z.infer<typeof TensionAnalysisInputSchema>;
 
@@ -149,37 +152,41 @@ export const TensionAnalysisOutputSchema = z.object({
 });
 export type TensionAnalysisOutput = z.infer<typeof TensionAnalysisOutputSchema>;
 
-// AI Flow related types
-export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'coreComponents' | 'keyConcepts'> & {
-  systemModel: SystemModel;
-  keyConcepts: StructuredConcept[];
-  initialSystemStatesSummary?: string; // Added to hold summary from new flow
+// AI Flow related types (TypeScript types, not Zod schemas here unless for inference)
+
+// For reflectAssertion output used in page.tsx
+export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'keyConcepts' | 'systemModel'> & {
+  systemModel: SystemModel; // Ensure this is our defined SystemModel TS type
+  keyConcepts: StructuredConcept[]; // Ensure this is our defined StructuredConcept TS type
+  initialSystemStatesSummary?: string;
 };
 
-// New flow: InferInitialQualitativeState
+// For inferInitialQualitativeStates flow
 export const InferInitialQualitativeStateInputSchema = z.object({
     assertionText: z.string(),
-    systemModel: SystemModelSchema,
+    systemModel: SystemModelSchema, // Input is a Zod schema validated SystemModel
 });
 export type InferInitialQualitativeStateInput = z.infer<typeof InferInitialQualitativeStateInputSchema>;
 
 export const InferInitialQualitativeStateOutputSchema = z.object({
-    systemModelWithQualitativeStates: SystemModelSchema.describe("The input system model with an added 'qualitativeState' for each stock."),
+    systemModelWithQualitativeStates: SystemModelSchema, // Output is also Zod schema validated
     initialStatesSummary: z.string().describe("A brief summary from the AI explaining the inferred initial qualitative states of the stocks.")
 });
 export type InferInitialQualitativeStateOutput = z.infer<typeof InferInitialQualitativeStateOutputSchema>;
 
 
-// GenerateImpactsByOrder becomes GeneratePhaseConsequences conceptually
-export type AIGenerateImpactsByOrderInput = Omit<AIGenerateImpactsByOrderInputOriginal, 'parentImpacts' | 'targetOrder' | 'tensionAnalysis'> & {
-  parentImpacts?: Impact[]; // Optional: for narrative continuity from previous phase/assertion
-  targetPhase: z.enum(['1', '2', '3']); // Represents Initial, Transition, Stabilization
-  currentSystemQualitativeStates: z.record(z.string()).describe("Current qualitative states of all system stocks (e.g., {'Employee Trust': 'Moderate'}).");
-  tensionAnalysis?: TensionAnalysisOutput;
-  systemModel: SystemModel; // Full model for context
+// For generateImpactsByOrder flow (conceptually GeneratePhaseConsequences)
+// AIGenerateImpactsByOrderInputOriginal is a TypeScript type: z.infer<typeof GeneratePhaseConsequencesInputSchema>
+// It has fields: assertionText, targetPhase, parentImpacts?, currentSystemQualitativeStates, tensionAnalysis?, systemModel
+export type AIGenerateImpactsByOrderInput = {
+  assertionText: string;
+  targetPhase: '1' | '2' | '3'; // Explicit TS type
+  parentImpacts?: Impact[]; // Explicit TS type
+  currentSystemQualitativeStates: Record<string, string>; // Explicit TS type
+  tensionAnalysis?: TensionAnalysisOutput; // Explicit TS type
+  systemModel: SystemModel; // Explicit TS type
 };
 
-// Updating the AIGenerateImpactsByOrderOutputOriginal by extending it or redefining
 export const GeneratePhaseConsequencesOutputSchema = z.object({
     generatedImpacts: z.array(ImpactSchema),
     updatedSystemQualitativeStates: z.record(z.string()).optional().describe("The new qualitative states of stocks after these impacts."),
@@ -193,11 +200,11 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
   nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT';
   properties: {
     fullAssertionText?: string;
-    systemModel?: SystemModel; // SystemModel now contains qualitative states for stocks
+    systemModel?: SystemModel;
     keyConcepts?: StructuredConcept[];
     attributes?: string[];
     tensionAnalysis?: TensionAnalysisOutput;
-    feedbackLoopInsights?: string[]; // Store feedback related to this impact
+    feedbackLoopInsights?: string[];
     [key: string]: any;
   };
   originalColor?: string;
@@ -216,7 +223,7 @@ export const NODE_COLORS: Record<number, string> = {
 };
 
 export const VALIDITY_OPTIONS: Array<{ value: 'high' | 'medium' | 'low'; label: string }> = [
-  { value: 'high', label: 'High Plausibility' }, // Changed label slightly
+  { value: 'high', label: 'High Plausibility' },
   { value: 'medium', label: 'Medium Plausibility' },
   { value: 'low', label: 'Low Plausibility' },
 ];
@@ -226,20 +233,16 @@ export enum ExplorerStep {
   REFLECTION_PENDING = 'reflection_pending',
   REFLECTION_REVIEW = 'reflection_review',
   REVISING_SYSTEM_MODEL = 'revising_system_model',
-  INFERRING_INITIAL_STATE = 'inferring_initial_state', // New step
-  INITIAL_STATE_REVIEW = 'initial_state_review', // Optional, or combined with tension
+  INFERRING_INITIAL_STATE = 'inferring_initial_state',
+  INITIAL_STATE_REVIEW = 'initial_state_review', 
   TENSION_ANALYSIS_PENDING = 'tension_analysis_pending',
   TENSION_ANALYSIS_REVIEW = 'tension_analysis_review',
-  // Renaming conceptually, but keeping values for less churn if possible
-  // ORDER_1_PENDING -> PHASE_1_CONSEQUENCES_PENDING
-  ORDER_1_PENDING = 'order_1_pending', // Represents generating initial consequences
-  ORDER_1_REVIEW = 'order_1_review',   // Review initial consequences
-  // ORDER_2_PENDING -> TRANSITION_PHASE_PENDING
-  ORDER_2_PENDING = 'order_2_pending', // Represents generating transition consequences
-  ORDER_2_REVIEW = 'order_2_review',   // Review transition consequences
-  // ORDER_3_PENDING -> STABILIZATION_PHASE_PENDING
-  ORDER_3_PENDING = 'order_3_pending', // Represents generating stabilization consequences
-  ORDER_3_REVIEW = 'order_3_review',   // Review stabilization consequences
+  ORDER_1_PENDING = 'order_1_pending', 
+  ORDER_1_REVIEW = 'order_1_review',   
+  ORDER_2_PENDING = 'order_2_pending', 
+  ORDER_2_REVIEW = 'order_2_review',   
+  ORDER_3_PENDING = 'order_3_pending', 
+  ORDER_3_REVIEW = 'order_3_review',   
   GENERATING_SUMMARY = 'generating_summary',
   FINAL_REVIEW = 'final_review',
   CONSOLIDATION_PENDING = 'consolidation_pending',
@@ -253,5 +256,3 @@ export interface GoalOption {
   placeholder: string;
   icon?: React.ElementType;
 }
-
-    
