@@ -78,16 +78,22 @@ const reviseSystemModelFlow = ai.defineFlow(
   },
   async (input) => {
     if (!input.currentSystemModel || !input.userFeedback) {
+      // This check is important for developer error, should not happen from UI if checks are in place.
+      console.error("reviseSystemModelFlow: Current system model or user feedback is missing.", input);
       throw new Error('Current system model and user feedback must be provided.');
     }
-    const {output} = await revisePrompt(input);
-    if (!output?.revisedSystemModel || !output?.revisionSummary) {
-        // Fallback if AI output is malformed
+    
+    const result = await revisePrompt(input);
+
+    if (!result || !result.output || !result.output.revisedSystemModel || !result.output.revisionSummary) {
+        console.error('Revise system model prompt did not return the expected output structure.', result);
+        // Fallback if AI output is malformed to ensure the flow still returns something
+        // that matches the output schema, even if it's just the original model.
         return {
-            revisedSystemModel: input.currentSystemModel, // Return original if AI fails
-            revisionSummary: "The AI was unable to process the revisions as requested. The system model has not been changed."
+            revisedSystemModel: input.currentSystemModel, 
+            revisionSummary: "The AI was unable to process the revisions as requested or the output was malformed. The system model has not been changed."
         };
     }
-    return output;
+    return result.output;
   }
 );

@@ -116,8 +116,11 @@ const generateImpactsByOrderFlow = ai.defineFlow(
       isTargetOrder3,
     };
 
-    const {output} = await prompt(promptInput);
-    return output!;
+    const result = await prompt(promptInput);
+    if (!result || !result.output) {
+      console.error('Generate impacts by order prompt did not return the expected output structure.', result);
+      throw new Error('AI failed to provide valid impacts output.');
+    }
+    return result.output;
   }
 );
-

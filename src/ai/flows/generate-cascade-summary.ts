@@ -111,11 +111,12 @@ const generateCascadeSummaryFlow = ai.defineFlow(
         thirdOrderImpacts: input.thirdOrderImpacts || [],
     };
 
-    const {output} = await summaryPrompt(promptInput);
-    if (!output?.narrativeSummary) {
-        return { narrativeSummary: "The AI was unable to generate a narrative summary for the provided impact map at this time." };
+    const result = await summaryPrompt(promptInput);
+    if (!result || !result.output || !result.output.narrativeSummary) {
+      console.error('Generate cascade summary prompt did not return the expected output structure.', result);
+      // Return a fallback object that still conforms to CascadeSummaryOutputSchema
+      return { narrativeSummary: "The AI was unable to generate a narrative summary for the provided impact map at this time." };
     }
-    return output;
+    return result.output;
   }
 );
-

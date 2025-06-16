@@ -90,9 +90,12 @@ const reflectAssertionFlow = ai.defineFlow(
     outputSchema: ReflectAssertionOutputSchema,
   },
   async input => {
-    const {output} = await reflectAssertionPrompt(input);
-    return output!;
+    const result = await reflectAssertionPrompt(input);
+    if (!result || !result.output) {
+      console.error('Assertion reflection prompt did not return the expected output structure.', result);
+      throw new Error('AI failed to provide a valid reflection output.');
+    }
+    return result.output;
   }
 );
-
     

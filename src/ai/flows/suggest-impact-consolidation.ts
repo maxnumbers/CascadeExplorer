@@ -125,8 +125,11 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
         return { consolidationSuggestions: [] };
     }
 
-    const {output} = await consolidationPrompt(promptInput);
-    return output!;
+    const result = await consolidationPrompt(promptInput);
+    if (!result || !result.output) {
+      console.error('Suggest impact consolidation prompt did not return the expected output structure.', result);
+      throw new Error('AI failed to provide valid consolidation suggestions output.');
+    }
+    return result.output;
   }
 );
-
