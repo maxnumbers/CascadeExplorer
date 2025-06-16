@@ -67,7 +67,7 @@ Third-Order Impacts (Stemming from Second-Order Impacts):
 {{/if}}
 
 Your task is to generate a "narrativeSummary" in the form of a persuasive essay. This essay should:
-1.  **Introduction**: Begin by clearly stating the initial assertion and hinting at the profound cascade of consequences it unleashes. Establish the gravity or significance of this starting point.
+1.  **Introduction**: Begin by clearly restating the initial assertion, framed as a question to explore, and hinting at the profound cascade of consequences it unleashes. Establish the gravity or significance of this starting point.
 2.  **Body - Develop the Argument Step-by-Step**:
     *   **Narrative Integration**: Your essay must flow naturally. When discussing the impacts, **do not simply restate their 'Label' verbatim**. Instead, describe the *concept, phenomenon, or consequence represented by the label* in your own narrative words. Integrate these ideas smoothly into the essay, making it read like a cohesive argument rather than a recitation of impact titles. For example, if an impact label is 'Economic Downturn', you might write, 'This subsequently led to a significant contraction in economic activity...' rather than 'This led to Economic Downturn...'.
     *   **Elaborate on Connections**: Do NOT just list the impacts. Weave a compelling narrative that explicitly explains the *mechanisms* and *logical progression* by which one impact leads to another. Build an irrefutable case for the cascade.

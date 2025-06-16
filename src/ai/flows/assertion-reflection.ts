@@ -5,7 +5,7 @@
 
 /**
  * @fileOverview Reflects the user's initial assertion using AI to confirm understanding,
- * extracting a system model (stocks, agents, incentives) from the assertion.
+ * extracting a system model (stocks, agents, incentives, stock-to-stock flows) from the assertion.
  *
  * - reflectAssertion - A function that reflects the user's assertion.
  * - ReflectAssertionInput - The input type for the reflectAssertion function.
@@ -14,7 +14,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { StructuredConceptSchema, SystemModelSchema } from '@/types/cascade'; // Import new SystemModelSchema
+import { StructuredConceptSchema, SystemModelSchema } from '@/types/cascade';
 
 const ReflectAssertionInputSchema = z.object({
   assertion: z
@@ -26,7 +26,7 @@ export type ReflectAssertionInput = z.infer<typeof ReflectAssertionInputSchema>;
 const ReflectAssertionOutputSchema = z.object({
   reflection: z.string().describe('The AI-generated reflection of the user assertion (1-2 sentences).'),
   summary: z.string().describe('A very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.'),
-  systemModel: SystemModelSchema.describe("A system model identified from the assertion, including key 'stocks' (accumulations/resources), 'agents' (actors), and 'incentives' (agents' motivations towards stocks, and resulting flows)."),
+  systemModel: SystemModelSchema.describe("A system model identified from the assertion, including key 'stocks' (accumulations/resources), 'agents' (actors), 'incentives' (agents' motivations towards stocks, and resulting flows), and 'stockToStockFlows' (direct influences between stocks)."),
   keyConcepts: z.array(StructuredConceptSchema).describe("A list of general key concepts or entities (each as an object with a 'name' and an optional 'type' like 'Technology', 'Person', 'Organization') mentioned in the assertion, distinct from the system model components but potentially overlapping."),
   confirmationQuestion: z.string().describe('A question to confirm understanding with the user.'),
 });
@@ -56,7 +56,8 @@ Based on this assertion, you must:
     *   **Agents**: Identify 3-10 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors'). For each agent, provide:
         *   'name': A concise name for the agent.
         *   'description' (optional): A brief explanation of this agent's role or nature.
-    *   **Incentives & Flows (Crucial for System Dynamics)**: This part requires careful, systematic thought.
+            When identifying agents, also briefly consider if the assertion implies any key agents or societal forces that would likely act to counter or buffer the main changes proposed.
+    *   **Incentives & Flows (Agent-Stock Interactions)**: This part requires careful, systematic thought.
         *   **Initial Pass - Obvious Connections**: First, based on the stocks and agents you've identified, pinpoint the most direct and primary incentives. For these, describe the agent's main motivation regarding a stock and the most likely resulting flow or action, all derived *explicitly* from the user's assertion.
         *   **Review and Expansion Pass - Holistic System Mapping**:
             Now, critically review ALL stocks and ALL agents you've listed above. Your goal is to build a more complete map of interdependencies that are *still grounded in the user's assertion*.
@@ -71,15 +72,21 @@ Based on this assertion, you must:
                 *   "Are there any other minor agents, groups, or even abstract forces (e.g., 'Market Demand', 'Technological Obsolescence') *implied by the assertion* that have clear incentives related to the identified stocks?" If a strong case can be made *from the assertion text*, briefly add them as agents and define their key incentive and flow. Be very selective here; do not invent agents not supported by the text.
         *   **Final Output for Incentives**: Consolidate your findings from both passes. Aim to identify a total of 4-7 *distinct and significant* incentives in your final output. For each, ensure you provide:
             *   'agentName': The name of the agent (must match one of the agents identified or added).
-            *   'targetStockName': The name of the stock the incentive is primarily directed towards (must match one of_the stocks identified).
+            *   'targetStockName': The name of the stock the incentive is primarily directed towards (must match one of the stocks identified).
             *   'incentiveDescription': A clear description of the agent's motivation or goal concerning the stock, derived from the assertion.
             *   'resultingFlow': A brief description of the typical action or flow this incentive drives, as implied by the assertion. This is highly encouraged.
-            These incentives and flows are what truly reveal the system's dynamics. Ensure all are directly derivable from and justified by the user's assertion.
+    *   **Stock-to-Stock Flows ('stockToStockFlows')** (Optional but encouraged): Identify 0-3 direct influences or flows *between different stocks* that are not directly mediated by an agent but are implied by the assertion's logic or the nature of the stocks themselves.
+        *   For each such flow, provide:
+            *   'sourceStockName': The name of the stock that is the source of the influence.
+            *   'targetStockName': The name of the stock that is being influenced by the source stock.
+            *   'flowDescription': A concise description of how the source stock influences the target stock (e.g., "Depletion of 'Clean Water' negatively impacts 'Crop Yields'", "Increased 'Innovation Rate' leads to faster 'Technology Obsolescence'").
+            *   'drivingForceDescription' (optional): A brief explanation of the underlying mechanism if not obvious (e.g., "Shared resource dependency", "Ecological balance").
+        *   These should represent more systemic, less direct-agent-driven relationships.
 4.  **General Key Concepts ('keyConcepts')**: Separately from the system model, identify a list of 2-5 general key concepts or entities mentioned in the assertion. Each concept should be an object with a 'name' (the concept itself) and an optional 'type' (e.g., 'Technology', 'Social Trend', 'Organization', 'Location', 'Person'). These might overlap with system model elements but represent broader themes.
 5.  **Confirmation Question ('confirmationQuestion')**: Generate a concise question to ask the user to confirm your understanding of their assertion, focusing on the core intent or the system you've identified.
 
 Ensure your entire output strictly adheres to the requested JSON schema structure.
-The 'systemModel' component, especially the 'incentives' describing agent-stock interactions, is particularly important for systems thinking.
+The 'systemModel' component, especially the 'incentives' describing agent-stock interactions and any 'stockToStockFlows', is particularly important for systems thinking.
 `,
 });
 
@@ -91,11 +98,12 @@ const reflectAssertionFlow = ai.defineFlow(
   },
   async input => {
     const result = await reflectAssertionPrompt(input);
-    if (!result || !result.output) {
-      console.error('Assertion reflection prompt did not return the expected output structure.', result);
-      throw new Error('AI failed to provide a valid reflection output.');
+    if (!result || !result.output || !result.output.systemModel) {
+      console.error('Assertion reflection prompt did not return the expected output structure. Missing systemModel.', result);
+      throw new Error('AI failed to provide a valid reflection output with a system model.');
     }
     return result.output;
   }
 );
+
     

@@ -33,10 +33,19 @@ export const SystemIncentiveSchema = z.object({
 });
 export type SystemIncentive = z.infer<typeof SystemIncentiveSchema>;
 
+export const StockToStockFlowSchema = z.object({
+  sourceStockName: z.string().describe("The stock that is the source of the influence."),
+  targetStockName: z.string().describe("The stock that is being influenced."),
+  flowDescription: z.string().describe("Description of how the source stock influences the target stock (e.g., 'Depletion of X leads to increase in Y', 'Growth in A enables growth in B')."),
+  drivingForceDescription: z.string().optional().describe("Brief explanation of the underlying mechanism or reason for this direct stock-to-stock interaction, if not obvious from their nature (e.g., 'Shared resource dependency', 'Natural ecological succession').")
+});
+export type StockToStockFlow = z.infer<typeof StockToStockFlowSchema>;
+
 export const SystemModelSchema = z.object({
   stocks: z.array(SystemStockSchema).describe("Key accumulations or resources in the system that can change over time."),
   agents: z.array(SystemAgentSchema).describe("Actors or entities within the system that can influence stocks."),
-  incentives: z.array(SystemIncentiveSchema).describe("Primary incentives of agents related to identified stocks, and the flows they drive.")
+  incentives: z.array(SystemIncentiveSchema).describe("Primary incentives of agents related to identified stocks, and the flows they drive."),
+  stockToStockFlows: z.array(StockToStockFlowSchema).optional().describe("Direct influences or flows between different stocks, independent of direct agent actions (e.g., resource depletion leading to consequence, ecological dependencies).")
 });
 export type SystemModel = z.infer<typeof SystemModelSchema>;
 
@@ -94,6 +103,48 @@ export const ReviseSystemModelOutputSchema = z.object({
 });
 export type ReviseSystemModelOutput = z.infer<typeof ReviseSystemModelOutputSchema>;
 
+// Schemas for Tension Analysis
+const CompetingStakeholderResponseSchema = z.object({
+  agentName: z.string().describe("Name of the agent from the SystemModel."),
+  supportiveResponse: z.object({
+    description: z.string().describe("How this agent would likely support or further the assertion."),
+    reasoning: z.string().describe("Why this agent would respond supportively (motivations, interests).")
+  }).describe("Likely supportive actions or stance of the agent towards the assertion."),
+  resistantResponse: z.object({
+    description: z.string().describe("How this agent would likely resist, hinder, or subvert the assertion."),
+    reasoning: z.string().describe("Why this agent would respond with resistance (motivations, fears, conflicting interests).")
+  }).describe("Likely resistant actions or stance of the agent towards the assertion."),
+  keyAssumptions: z.string().optional().describe("Key assumptions made about this agent's behavior or context influencing these responses.")
+});
+export type CompetingStakeholderResponse = z.infer<typeof CompetingStakeholderResponseSchema>;
+
+const ResourceConstraintSchema = z.object({
+  resourceName: z.string().describe("Name of a key resource (e.g., 'Funding', 'Public Support', 'Skilled Labor', 'Time', 'Political Capital')."),
+  potentialScarcityImpact: z.string().describe("How scarcity or competition for this resource could negatively impact the assertion's success or lead to unintended consequences."),
+  demandsOnResource: z.string().describe("Briefly explain how the assertion or its direct intended outcomes would demand this resource.")
+});
+export type ResourceConstraint = z.infer<typeof ResourceConstraintSchema>;
+
+const IdentifiedTradeOffSchema = z.object({
+  primaryPositiveOutcome: z.string().describe("A primary intended positive outcome or goal of the assertion."),
+  potentialNegativeConsequenceOrOpportunityCost: z.string().describe("A significant negative consequence, trade-off, or opportunity cost directly associated with achieving the positive outcome."),
+  explanation: z.string().describe("Explanation of why this trade-off exists or how the negative consequence arises from pursuing the positive outcome.")
+});
+export type IdentifiedTradeOff = z.infer<typeof IdentifiedTradeOffSchema>;
+
+export const TensionAnalysisInputSchema = z.object({
+  assertionText: z.string().describe("The initial user assertion text."),
+  systemModel: SystemModelSchema.describe("The system model (stocks, agents, incentives, stock-to-stock flows) generated from the assertion.")
+});
+export type TensionAnalysisInput = z.infer<typeof TensionAnalysisInputSchema>;
+
+export const TensionAnalysisOutputSchema = z.object({
+  competingStakeholderResponses: z.array(CompetingStakeholderResponseSchema).describe("Analysis of how key agents might support or resist the assertion."),
+  resourceConstraints: z.array(ResourceConstraintSchema).describe("Identification of key resource constraints and their potential impact."),
+  identifiedTradeOffs: z.array(IdentifiedTradeOffSchema).describe("Explicitly identified trade-offs or negative consequences of pursuing the assertion's goals.")
+});
+export type TensionAnalysisOutput = z.infer<typeof TensionAnalysisOutputSchema>;
+
 
 // Re-export AI types for easier access if needed elsewhere
 export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'coreComponents' | 'keyConcepts'> & {
@@ -102,7 +153,10 @@ export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'c
 };
 
 
-export type AIGenerateImpactsByOrderInput = AIGenerateImpactsByOrderInputOriginal;
+export type AIGenerateImpactsByOrderInput = Omit<AIGenerateImpactsByOrderInputOriginal, 'parentImpacts'> & {
+  parentImpacts: Impact[] | undefined; // Ensure parentImpacts uses the local Impact type
+  tensionAnalysis?: TensionAnalysisOutput; // Optional tension analysis input
+};
 export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOriginal;
 
 
@@ -115,6 +169,7 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
     systemModel?: SystemModel; // Specific to CORE_ASSERTION, replaces coreComponents
     keyConcepts?: StructuredConcept[]; // Mirror from Impact.keyConcepts or from reflection's general key concepts
     attributes?: string[]; // Mirror from Impact.attributes for easy access in panel
+    tensionAnalysis?: TensionAnalysisOutput; // Store tension analysis result with the core assertion node
     [key: string]: any;
   };
   originalColor?: string;
@@ -142,7 +197,9 @@ export enum ExplorerStep {
   INITIAL = 'initial',
   REFLECTION_PENDING = 'reflection_pending',
   REFLECTION_REVIEW = 'reflection_review',
-  REVISING_SYSTEM_MODEL = 'revising_system_model', // New step
+  REVISING_SYSTEM_MODEL = 'revising_system_model',
+  TENSION_ANALYSIS_PENDING = 'tension_analysis_pending', // New step
+  TENSION_ANALYSIS_REVIEW = 'tension_analysis_review',   // New step
   ORDER_1_PENDING = 'order_1_pending',
   ORDER_1_REVIEW = 'order_1_review',
   ORDER_2_PENDING = 'order_2_pending',
@@ -162,3 +219,5 @@ export interface GoalOption {
   placeholder: string; // Example assertion text / placeholder for the textarea
   icon?: React.ElementType;
 }
+
+    
