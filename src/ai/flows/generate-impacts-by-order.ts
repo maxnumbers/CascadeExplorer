@@ -28,6 +28,15 @@ const GeneratePhaseConsequencesInputSchema = z.object({
 });
 export type GeneratePhaseConsequencesInput = z.infer<typeof GeneratePhaseConsequencesInputSchema>;
 
+// Internal schema for the prompt, extending the flow input with boolean phase flags
+const PhasePromptInternalInputSchema = GeneratePhaseConsequencesInputSchema.extend({
+  isPhase1: z.boolean(),
+  isPhase2: z.boolean(),
+  isPhase3: z.boolean(),
+});
+type PhasePromptInternalInput = z.infer<typeof PhasePromptInternalInputSchema>;
+
+
 // Output schema is GeneratePhaseConsequencesOutputSchema from types/cascade.ts
 export type { GeneratePhaseConsequencesOutput };
 
@@ -38,7 +47,7 @@ export async function generateImpactsByOrder(input: GeneratePhaseConsequencesInp
 
 const phasePrompt = ai.definePrompt({
   name: 'generatePhaseConsequencesPrompt',
-  input: {schema: GeneratePhaseConsequencesInputSchema}, 
+  input: {schema: PhasePromptInternalInputSchema}, // Use the internal schema with boolean flags
   output: {schema: GeneratePhaseConsequencesOutputSchema},
   prompt: `You are a Systems Dynamics Analyst. Your task is to model the evolution of a system through qualitative phases, considering its current state, tensions, and how impacts create feedback loops.
 
@@ -65,16 +74,16 @@ Incorporate these tensions into your reasoning. How might they shape the consequ
 {{/if}}
 
 We are generating consequences for:
-{{#if (eq targetPhase "1")}}**Phase 1: Initial Consequences** (Direct effects of the assertion given initial states and tensions).
+{{#if isPhase1}}**Phase 1: Initial Consequences** (Direct effects of the assertion given initial states and tensions).
   Parent context: The main assertion "{{assertionText}}".
   Number of distinct consequences to generate: 3-5.
 {{/if}}
-{{#if (eq targetPhase "2")}}**Phase 2: Transition Phase Consequences** (Effects stemming from Initial Consequences, considering evolving system states and tensions).
+{{#if isPhase2}}**Phase 2: Transition Phase Consequences** (Effects stemming from Initial Consequences, considering evolving system states and tensions).
   Parent Impacts from Phase 1:
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
   Number of distinct consequences to generate per parent: 2-3.
 {{/if}}
-{{#if (eq targetPhase "3")}}**Phase 3: Stabilization Phase Consequences** (Longer-term shifts and emergent system behaviors as it moves towards new equilibriums).
+{{#if isPhase3}}**Phase 3: Stabilization Phase Consequences** (Longer-term shifts and emergent system behaviors as it moves towards new equilibriums).
   Parent Impacts from Phase 2:
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
   Number of distinct consequences to generate per parent: 1-2.
@@ -116,7 +125,15 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
       return { generatedImpacts: [], updatedSystemQualitativeStates: {}, feedbackLoopInsights: [] };
     }
 
-    const result = await phasePrompt(input);
+    // Prepare the input for the prompt, including boolean flags for phase
+    const promptInputForAI: PhasePromptInternalInput = {
+      ...input,
+      isPhase1: input.targetPhase === '1',
+      isPhase2: input.targetPhase === '2',
+      isPhase3: input.targetPhase === '3',
+    };
+
+    const result = await phasePrompt(promptInputForAI);
 
     if (!result || !result.output || !result.output.generatedImpacts) {
       console.error('Generate phase consequences prompt did not return the expected output structure (missing generatedImpacts).', result);
