@@ -1,9 +1,10 @@
 
 'use server';
 /**
- * @fileOverview Generates a narrative summary of the entire impact cascade.
+ * @fileOverview Generates a narrative summary of the system's evolution through phases,
+ * incorporating qualitative state changes, feedback loops, and equilibrium thinking.
  *
- * - generateCascadeSummary - A function that creates a summary from the full impact map.
+ * - generateCascadeSummary - A function that creates a summary from the full impact map and system dynamics.
  * - CascadeSummaryInput - The input type for the generateCascadeSummary function.
  * - CascadeSummaryOutput - The return type for the generateCascadeSummary function.
  */
@@ -23,72 +24,75 @@ const summaryPrompt = ai.definePrompt({
   name: 'generateCascadeSummaryPrompt',
   input: {schema: CascadeSummaryInputSchema},
   output: {schema: CascadeSummaryOutputSchema},
-  prompt: `You are an expert analyst and persuasive writer tasked with composing a compelling essay that explains the cascading consequences of an initial assertion.
-Your goal is to construct a powerful argument, drawing a clear and irrefutable line from the initial assertion to its ultimate, far-reaching consequences.
-You will receive a structured set of impacts: the initial assertion, and its first, second, and third-order consequences. Each impact includes its label, description, validity, key concepts, attributes, and (for 2nd/3rd order impacts) causal reasoning linking it to its parent.
+  prompt: `You are an expert Systems Analyst and Persuasive Writer. Your task is to compose a compelling essay explaining the evolution of a system in response to an initial assertion.
+The system's state changes qualitatively across phases, influenced by impacts, tensions, and feedback loops, eventually tending towards one or more equilibrium states.
 
 Initial Assertion Summary: "{{initialAssertion.summary}}"
 Full Assertion Text: "{{initialAssertion.fullText}}"
 
-First-Order Impacts (Direct Consequences of the Assertion):
-{{#if firstOrderImpacts.length}}
-  {{#each firstOrderImpacts}}
-  - Impact ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
-    {{#if keyConcepts.length}}Key Concepts: {{#each keyConcepts}}{{name}}{{#if type}} ({{type}}){{/if}}{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
-    {{#if attributes.length}}Attributes: {{#each attributes}}"{{this}}"{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
-    {{#if causalReasoning}}Causal Reasoning (linking to assertion): "{{causalReasoning}}"{{/if}}
-  {{/each}}
-{{else}}
-  No first-order impacts were identified for this assertion.
+{{#if initialSystemStatesSummary}}
+Summary of Initial Qualitative System States (before any impacts):
+"{{initialSystemStatesSummary}}"
 {{/if}}
 
-Second-Order Impacts (Stemming from First-Order Impacts):
-{{#if secondOrderImpacts.length}}
-  {{#each secondOrderImpacts}}
-  - Impact ID: {{id}}, ParentID (1st order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
-    {{#if keyConcepts.length}}Key Concepts: {{#each keyConcepts}}{{name}}{{#if type}} ({{type}}){{/if}}{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
-    {{#if attributes.length}}Attributes: {{#each attributes}}"{{this}}"{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
-    {{#if causalReasoning}}Causal Reasoning (from parent {{parentId}}): "{{causalReasoning}}"{{/if}}
+Phase 1 Impacts (Initial Consequences):
+{{#if firstPhaseImpacts.length}}
+  {{#each firstPhaseImpacts}}
+  - Impact ID: {{id}}, Label: "{{label}}", Description: "{{description}}"
+    (Validity: {{validity}}, Causal Reasoning: "{{causalReasoning}}")
   {{/each}}
 {{else}}
-  No second-order impacts were identified.
+  No first-phase impacts were identified.
 {{/if}}
 
-Third-Order Impacts (Stemming from Second-Order Impacts):
-{{#if thirdOrderImpacts.length}}
-  {{#each thirdOrderImpacts}}
-  - Impact ID: {{id}}, ParentID (2nd order): {{parentId}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}
-    {{#if keyConcepts.length}}Key Concepts: {{#each keyConcepts}}{{name}}{{#if type}} ({{type}}){{/if}}{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
-    {{#if attributes.length}}Attributes: {{#each attributes}}"{{this}}"{{#unless @last}}; {{/unless}}{{/each}}{{/if}}
-    {{#if causalReasoning}}Causal Reasoning (from parent {{parentId}}): "{{causalReasoning}}"{{/if}}
+Phase 2 Impacts (Transition Phase):
+{{#if transitionPhaseImpacts.length}}
+  {{#each transitionPhaseImpacts}}
+  - Impact ID: {{id}}, ParentID (Phase 1): {{parentId}}, Label: "{{label}}", Description: "{{description}}"
+    (Validity: {{validity}}, Causal Reasoning: "{{causalReasoning}}")
   {{/each}}
 {{else}}
-  No third-order impacts were identified.
+  No transition-phase impacts were identified.
 {{/if}}
 
-Your task is to generate a "narrativeSummary" in the form of a persuasive essay. This essay should:
-1.  **Introduction**: Begin by clearly restating the initial assertion, framed as a question to explore, and hinting at the profound cascade of consequences it unleashes. Establish the gravity or significance of this starting point.
-2.  **Body - Develop the Argument Step-by-Step**:
-    *   **Narrative Integration**: Your essay must flow naturally. When discussing the impacts, **do not simply restate their 'Label' verbatim**. Instead, describe the *concept, phenomenon, or consequence represented by the label* in your own narrative words. Integrate these ideas smoothly into the essay, making it read like a cohesive argument rather than a recitation of impact titles. For example, if an impact label is 'Economic Downturn', you might write, 'This subsequently led to a significant contraction in economic activity...' rather than 'This led to Economic Downturn...'.
-    *   **Elaborate on Connections**: Do NOT just list the impacts. Weave a compelling narrative that explicitly explains the *mechanisms* and *logical progression* by which one impact leads to another. Build an irrefutable case for the cascade.
-    *   **Leverage Provided Reasoning**: When an impact has a \`causalReasoning\` field explaining its link to its parent, you **must explicitly incorporate and elaborate on this reasoning in your narrative**. This is crucial for demonstrating the chain of causality. If \`causalReasoning\` is absent (e.g., for first-order impacts from the main assertion), construct the most robust logical bridge using the impact's description, key concepts, and attributes.
-    *   **Depth and Detail**: For each step in the cascade (Assertion to 1st order, 1st to 2nd order, 2nd to 3rd order), clearly articulate *how* and *why* these connections occur. Avoid superficial statements or unexplained jumps in logic. Use the provided \`keyConcepts\` and \`attributes\` to add specificity, credibility, and depth to your explanations of these mechanisms.
-    *   **Highlight Critical Pathways**: Trace significant causal pathways through the network. If multiple impacts converge to create a more significant meta-impact or a feedback loop, articulate this convergence and its amplified effects.
-    *   **Structure**: Organize this section logically, perhaps by following key branches of the cascade or by thematic grouping of consequences, always ensuring the reader can follow the step-by-step progression.
-3.  **Conclusion - Synthesize the Cascade**:
-    *   End with a powerful concluding statement that summarizes the overall argument and the main lines of causality you have developed.
-    *   Reiterate the most significant long-term outcomes and the inescapable logic of the cascade, leaving the reader with a strong understanding of the assertion's full implications.
-    *   **Crucially, ensure your conclusion strictly synthesizes the impacts and relationships presented in the provided data. Do not introduce new concepts, solutions, or external information not found within the impact map itself.**
-4.  **Tone and Style**: Maintain an authoritative, analytical, yet highly persuasive and articulate tone. Your language should be clear, precise, and impactful. Aim for a style that is both intellectually rigorous and compelling to read, as if presenting a meticulously researched case study.
-5.  **Essay Structure**: The essay should be well-structured with clear paragraphs, and of a length appropriate to cover the complexity of the provided impact map (typically several substantial paragraphs).
+Phase 3 Impacts (Stabilization Phase):
+{{#if stabilizationPhaseImpacts.length}}
+  {{#each stabilizationPhaseImpacts}}
+  - Impact ID: {{id}}, ParentID (Phase 2): {{parentId}}, Label: "{{label}}", Description: "{{description}}"
+    (Validity: {{validity}}, Causal Reasoning: "{{causalReasoning}}")
+  {{/each}}
+{{else}}
+  No stabilization-phase impacts were identified.
+{{/if}}
 
-Before finalizing your essay, critically review it:
-- Is every step in the causal chain clearly explained with sufficient detail and persuasive reasoning?
-- Have you successfully integrated the *concepts* behind the impact labels into a flowing narrative, rather than just listing the labels?
-- Have you fully utilized and elaborated upon the provided \`causalReasoning\`, \`keyConcepts\`, and \`attributes\` to support your analysis and explanations of connections?
-- Does the conclusion accurately reflect the main pathways and outcomes developed in the essay body, without introducing external elements?
+{{#if feedbackLoopInsights.length}}
+Identified Feedback Loop Insights during System Evolution:
+{{#each feedbackLoopInsights}}
+- "{{this}}"
+{{/each}}
+{{/if}}
 
-Focus on building an irrefutable case based on the provided data, demonstrating the chain of causality with clarity, depth, and persuasive insight.
+{{#if finalSystemQualitativeStates}}
+Final Qualitative States of Key System Stocks (after all phases):
+{{#each finalSystemQualitativeStates}}
+- {{ @key }}: {{this}}
+{{/each}}
+{{/if}}
+
+Your essay ("narrativeSummary") must:
+1.  **Introduction**: Start with the initial assertion. Briefly mention the inferred initial qualitative state of the system (if provided by 'initialSystemStatesSummary') to set the stage.
+2.  **Body - System Evolution Through Phases**:
+    *   Describe how the system evolves from its initial state. Narrate the progression of key impacts through Phase 1, Transition Phase, and Stabilization Phase.
+    *   **Integrate State Changes**: When discussing impacts, explain how they likely affected the qualitative states of relevant system stocks (e.g., "This policy initially strengthened 'Public Trust', but later strained 'Fiscal Reserves'.").
+    *   **Weave in Feedback Loops**: Explicitly incorporate the 'feedbackLoopInsights'. Explain how these loops (reinforcing or balancing) influenced the system's trajectory and the evolution of its qualitative states. For example: "The initial success in X created a reinforcing loop by boosting Y, which in turn further accelerated X."
+    *   **Highlight Key Dynamics**: Focus on the most significant causal chains, state shifts, and feedback mechanisms. Don't just list impacts; explain their interplay.
+3.  **Conclusion - Equilibrium and System Destination**:
+    *   Based on the entire evolution, the final qualitative states (if provided), and the identified feedback loops, discuss where the system tends to stabilize.
+    *   Describe 1-3 plausible "equilibrium states" or "system destinations." These are not necessarily static endpoints but rather dynamic patterns or conditions the system is likely to settle into. For example: "The system appears to be heading towards a new equilibrium characterized by high innovation but increased social stratification," or "A likely outcome is a fragile balance, with ongoing tension between force A and force B."
+    *   Your conclusion should synthesize the analysis into a coherent view of the system's likely future based *only* on the provided inputs.
+4.  **Tone and Style**: Authoritative, analytical, insightful, and persuasive. Make it read like a sophisticated systems analysis.
+
+Crucially, ensure your narrative is grounded in the provided data (assertion, impacts, states, feedback insights). Do not introduce external information. The goal is to synthesize the provided system dynamics into a compelling story of change and potential futures.
 `,
 });
 
@@ -98,25 +102,27 @@ const generateCascadeSummaryFlow = ai.defineFlow(
     inputSchema: CascadeSummaryInputSchema,
     outputSchema: CascadeSummaryOutputSchema,
   },
-  async (input) => {
-    // Basic validation: Ensure there's at least an assertion to work with.
+  async (input: CascadeSummaryInput) => {
     if (!input.initialAssertion?.fullText) {
         return { narrativeSummary: "The initial assertion was not provided or was empty, so a summary cannot be generated." };
     }
     // Ensure arrays are present even if empty for the prompt
-    const promptInput = {
+    const promptInput: CascadeSummaryInput = {
         ...input,
-        firstOrderImpacts: input.firstOrderImpacts || [],
-        secondOrderImpacts: input.secondOrderImpacts || [],
-        thirdOrderImpacts: input.thirdOrderImpacts || [],
+        firstPhaseImpacts: input.firstPhaseImpacts || [],
+        transitionPhaseImpacts: input.transitionPhaseImpacts || [],
+        stabilizationPhaseImpacts: input.stabilizationPhaseImpacts || [],
+        feedbackLoopInsights: input.feedbackLoopInsights || [],
+        // initialSystemStatesSummary and finalSystemQualitativeStates are optional and handled by Handlebars
     };
 
     const result = await summaryPrompt(promptInput);
     if (!result || !result.output || !result.output.narrativeSummary) {
       console.error('Generate cascade summary prompt did not return the expected output structure.', result);
-      // Return a fallback object that still conforms to CascadeSummaryOutputSchema
-      return { narrativeSummary: "The AI was unable to generate a narrative summary for the provided impact map at this time." };
+      return { narrativeSummary: "The AI was unable to generate a narrative summary for the provided system evolution at this time." };
     }
     return result.output;
   }
 );
+
+    

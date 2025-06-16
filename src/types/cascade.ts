@@ -15,7 +15,8 @@ export type StructuredConcept = z.infer<typeof StructuredConceptSchema>;
 
 export const SystemStockSchema = z.object({
   name: z.string().describe("Name of the stock (e.g., 'Public Trust', 'Market Share')."),
-  description: z.string().optional().describe("Brief description of what this stock represents or how it's measured.")
+  description: z.string().optional().describe("Brief description of what this stock represents or how it's measured."),
+  qualitativeState: z.string().optional().describe("The qualitative state of the stock (e.g., Strong, Moderate, Weak, Strained, Critical, Stable, Volatile). This is inferred by AI.")
 });
 export type SystemStock = z.infer<typeof SystemStockSchema>;
 
@@ -42,7 +43,7 @@ export const StockToStockFlowSchema = z.object({
 export type StockToStockFlow = z.infer<typeof StockToStockFlowSchema>;
 
 export const SystemModelSchema = z.object({
-  stocks: z.array(SystemStockSchema).describe("Key accumulations or resources in the system that can change over time."),
+  stocks: z.array(SystemStockSchema).describe("Key accumulations or resources in the system that can change over time, each potentially with a qualitative state."),
   agents: z.array(SystemAgentSchema).describe("Actors or entities within the system that can influence stocks."),
   incentives: z.array(SystemIncentiveSchema).describe("Primary incentives of agents related to identified stocks, and the flows they drive."),
   stockToStockFlows: z.array(StockToStockFlowSchema).optional().describe("Direct influences or flows between different stocks, independent of direct agent actions (e.g., resource depletion leading to consequence, ecological dependencies).")
@@ -53,21 +54,21 @@ export type SystemModel = z.infer<typeof SystemModelSchema>;
 export const ImpactSchema = z.object({
   id: z.string().describe('Unique identifier for the impact.'),
   label: z.string().describe('Short label for the impact (2-3 lines max).'),
-  description: z.string().describe('Detailed description of the impact.'),
+  description: z.string().describe('Detailed description of the impact, potentially noting how it interacts with system states.'),
   validity: z.enum(['high', 'medium', 'low']).describe('Validity assessment (high/medium/low).'),
   reasoning: z.string().describe('Reasoning for validity assessment.'),
-  parentId: z.string().optional().describe('The ID of the parent impact from the previous order, if applicable and generating for order > 1.'),
+  parentId: z.string().optional().describe('The ID of the parent impact from the previous order/phase, if applicable.'),
   keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
-  causalReasoning: z.string().optional().describe('Explanation of why this impact is a plausible consequence of its preceding impacts. For first-order impacts, this explains their link to the initial assertion.'),
+  causalReasoning: z.string().optional().describe('Explanation of why this impact is a plausible consequence of its preceding impacts and current system state. For first-phase impacts, this explains their link to the initial assertion and state.'),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
-// Schema for the input to the consolidation flow (all impacts grouped by order)
+// Schema for the input to the consolidation flow (all impacts grouped by order/phase)
 export const ImpactMappingInputForConsolidationSchema = z.object({
-  firstOrder: z.array(ImpactSchema).describe('Immediate/direct impacts of order 1.'),
-  secondOrder: z.array(ImpactSchema).describe('Downstream effects of order 2.'),
-  thirdOrder: z.array(ImpactSchema).describe('Societal shifts of order 3.'),
+  firstOrder: z.array(ImpactSchema).describe('Impacts from the first phase.'),
+  secondOrder: z.array(ImpactSchema).describe('Impacts from the transition phase.'),
+  thirdOrder: z.array(ImpactSchema).describe('Impacts from the stabilization phase.'),
 });
 export type ImpactMappingInputForConsolidation = z.infer<typeof ImpactMappingInputForConsolidationSchema>;
 
@@ -78,15 +79,18 @@ export const CascadeSummaryInputSchema = z.object({
         summary: z.string().describe("The AI's concise summary/title of the user's initial assertion."),
         fullText: z.string().describe("The user's original full assertion text."),
     }).describe("The starting point of the cascade."),
-    firstOrderImpacts: z.array(ImpactSchema).optional().describe("List of first-order impacts."),
-    secondOrderImpacts: z.array(ImpactSchema).optional().describe("List of second-order impacts, with parentId linking to first-order."),
-    thirdOrderImpacts: z.array(ImpactSchema).optional().describe("List of third-order impacts, with parentId linking to second-order."),
+    initialSystemStatesSummary: z.string().optional().describe("AI-generated summary of the initial qualitative states of the system's stocks."),
+    firstPhaseImpacts: z.array(ImpactSchema).optional().describe("List of impacts from the first phase (formerly 1st order)."),
+    transitionPhaseImpacts: z.array(ImpactSchema).optional().describe("List of impacts from the transition phase (formerly 2nd order)."),
+    stabilizationPhaseImpacts: z.array(ImpactSchema).optional().describe("List of impacts from the stabilization phase (formerly 3rd order)."),
+    feedbackLoopInsights: z.array(z.string()).optional().describe("Collected insights or descriptions of feedback loops identified during the phase progression."),
+    finalSystemQualitativeStates: z.record(z.string()).optional().describe("The final qualitative states of key system stocks after all phases.")
 });
 export type CascadeSummaryInput = z.infer<typeof CascadeSummaryInputSchema>;
 
 // Schema for the output of the cascade summary generation AI flow
 export const CascadeSummaryOutputSchema = z.object({
-  narrativeSummary: z.string().describe("A cohesive narrative summary explaining the logical progression from the initial assertion through its cascading impacts."),
+  narrativeSummary: z.string().describe("A cohesive narrative summary explaining the system's evolution through phases, incorporating feedback loops, and discussing potential equilibrium states."),
 });
 export type CascadeSummaryOutput = z.infer<typeof CascadeSummaryOutputSchema>;
 
@@ -134,7 +138,7 @@ export type IdentifiedTradeOff = z.infer<typeof IdentifiedTradeOffSchema>;
 
 export const TensionAnalysisInputSchema = z.object({
   assertionText: z.string().describe("The initial user assertion text."),
-  systemModel: SystemModelSchema.describe("The system model (stocks, agents, incentives, stock-to-stock flows) generated from the assertion.")
+  systemModel: SystemModelSchema.describe("The system model (stocks with their qualitative states, agents, incentives, stock-to-stock flows) generated from the assertion.") // SystemModel now includes qualitative states
 });
 export type TensionAnalysisInput = z.infer<typeof TensionAnalysisInputSchema>;
 
@@ -145,31 +149,55 @@ export const TensionAnalysisOutputSchema = z.object({
 });
 export type TensionAnalysisOutput = z.infer<typeof TensionAnalysisOutputSchema>;
 
-
-// Re-export AI types for easier access if needed elsewhere
+// AI Flow related types
 export type AIReflectAssertionOutput = Omit<AIReflectAssertionOutputOriginal, 'coreComponents' | 'keyConcepts'> & {
   systemModel: SystemModel;
-  keyConcepts: StructuredConcept[]; // Keep this for general key concepts from the assertion text itself
+  keyConcepts: StructuredConcept[];
+  initialSystemStatesSummary?: string; // Added to hold summary from new flow
 };
 
+// New flow: InferInitialQualitativeState
+export const InferInitialQualitativeStateInputSchema = z.object({
+    assertionText: z.string(),
+    systemModel: SystemModelSchema,
+});
+export type InferInitialQualitativeStateInput = z.infer<typeof InferInitialQualitativeStateInputSchema>;
 
-export type AIGenerateImpactsByOrderInput = Omit<AIGenerateImpactsByOrderInputOriginal, 'parentImpacts'> & {
-  parentImpacts: Impact[] | undefined; // Ensure parentImpacts uses the local Impact type
-  tensionAnalysis?: TensionAnalysisOutput; // Optional tension analysis input
+export const InferInitialQualitativeStateOutputSchema = z.object({
+    systemModelWithQualitativeStates: SystemModelSchema.describe("The input system model with an added 'qualitativeState' for each stock."),
+    initialStatesSummary: z.string().describe("A brief summary from the AI explaining the inferred initial qualitative states of the stocks.")
+});
+export type InferInitialQualitativeStateOutput = z.infer<typeof InferInitialQualitativeStateOutputSchema>;
+
+
+// GenerateImpactsByOrder becomes GeneratePhaseConsequences conceptually
+export type AIGenerateImpactsByOrderInput = Omit<AIGenerateImpactsByOrderInputOriginal, 'parentImpacts' | 'targetOrder' | 'tensionAnalysis'> & {
+  parentImpacts?: Impact[]; // Optional: for narrative continuity from previous phase/assertion
+  targetPhase: z.enum(['1', '2', '3']); // Represents Initial, Transition, Stabilization
+  currentSystemQualitativeStates: z.record(z.string()).describe("Current qualitative states of all system stocks (e.g., {'Employee Trust': 'Moderate'}).");
+  tensionAnalysis?: TensionAnalysisOutput;
+  systemModel: SystemModel; // Full model for context
 };
-export type AIGenerateImpactsByOrderOutput = AIGenerateImpactsByOrderOutputOriginal;
+
+// Updating the AIGenerateImpactsByOrderOutputOriginal by extending it or redefining
+export const GeneratePhaseConsequencesOutputSchema = z.object({
+    generatedImpacts: z.array(ImpactSchema),
+    updatedSystemQualitativeStates: z.record(z.string()).optional().describe("The new qualitative states of stocks after these impacts."),
+    feedbackLoopInsights: z.array(z.string()).optional().describe("Brief descriptions of any feedback loops identified or significantly affected by these impacts.")
+});
+export type GeneratePhaseConsequencesOutput = z.infer<typeof GeneratePhaseConsequencesOutputSchema>;
 
 
 export interface ImpactNode extends Impact, SimulationNodeDatum {
-  order: 0 | 1 | 2 | 3; // 0 for core assertion
+  order: 0 | 1 | 2 | 3; // Conceptually: 0 for core, 1 for Initial Phase, 2 for Transition, 3 for Stabilization
   nodeSystemType: 'CORE_ASSERTION' | 'GENERATED_IMPACT';
-  // Properties store data that might not be on ImpactSchema directly or is specific to UI/type (like fullAssertionText for core)
   properties: {
-    fullAssertionText?: string; // Specific to CORE_ASSERTION
-    systemModel?: SystemModel; // Specific to CORE_ASSERTION, replaces coreComponents
-    keyConcepts?: StructuredConcept[]; // Mirror from Impact.keyConcepts or from reflection's general key concepts
-    attributes?: string[]; // Mirror from Impact.attributes for easy access in panel
-    tensionAnalysis?: TensionAnalysisOutput; // Store tension analysis result with the core assertion node
+    fullAssertionText?: string;
+    systemModel?: SystemModel; // SystemModel now contains qualitative states for stocks
+    keyConcepts?: StructuredConcept[];
+    attributes?: string[];
+    tensionAnalysis?: TensionAnalysisOutput;
+    feedbackLoopInsights?: string[]; // Store feedback related to this impact
     [key: string]: any;
   };
   originalColor?: string;
@@ -181,16 +209,16 @@ export interface ImpactLink extends SimulationLinkDatum<ImpactNode> {
 }
 
 export const NODE_COLORS: Record<number, string> = {
-  0: 'hsl(var(--accent))',       // Core Assertion - Soft Purple
-  1: 'hsl(var(--primary))',      // 1st Order - Electric Blue
-  2: 'hsl(120 60% 50%)', // 2nd Order - Green
-  3: 'hsl(30 100% 50%)', // 3rd Order - Orange
+  0: 'hsl(var(--accent))',       // Core Assertion / Initial State
+  1: 'hsl(var(--primary))',      // Phase 1 (Initial Consequences)
+  2: 'hsl(120 60% 50%)', // Phase 2 (Transition)
+  3: 'hsl(30 100% 50%)', // Phase 3 (Stabilization)
 };
 
 export const VALIDITY_OPTIONS: Array<{ value: 'high' | 'medium' | 'low'; label: string }> = [
-  { value: 'high', label: 'High Validity' },
-  { value: 'medium', label: 'Medium Validity' },
-  { value: 'low', label: 'Low Validity' },
+  { value: 'high', label: 'High Plausibility' }, // Changed label slightly
+  { value: 'medium', label: 'Medium Plausibility' },
+  { value: 'low', label: 'Low Plausibility' },
 ];
 
 export enum ExplorerStep {
@@ -198,14 +226,20 @@ export enum ExplorerStep {
   REFLECTION_PENDING = 'reflection_pending',
   REFLECTION_REVIEW = 'reflection_review',
   REVISING_SYSTEM_MODEL = 'revising_system_model',
-  TENSION_ANALYSIS_PENDING = 'tension_analysis_pending', // New step
-  TENSION_ANALYSIS_REVIEW = 'tension_analysis_review',   // New step
-  ORDER_1_PENDING = 'order_1_pending',
-  ORDER_1_REVIEW = 'order_1_review',
-  ORDER_2_PENDING = 'order_2_pending',
-  ORDER_2_REVIEW = 'order_2_review',
-  ORDER_3_PENDING = 'order_3_pending',
-  ORDER_3_REVIEW = 'order_3_review',
+  INFERRING_INITIAL_STATE = 'inferring_initial_state', // New step
+  INITIAL_STATE_REVIEW = 'initial_state_review', // Optional, or combined with tension
+  TENSION_ANALYSIS_PENDING = 'tension_analysis_pending',
+  TENSION_ANALYSIS_REVIEW = 'tension_analysis_review',
+  // Renaming conceptually, but keeping values for less churn if possible
+  // ORDER_1_PENDING -> PHASE_1_CONSEQUENCES_PENDING
+  ORDER_1_PENDING = 'order_1_pending', // Represents generating initial consequences
+  ORDER_1_REVIEW = 'order_1_review',   // Review initial consequences
+  // ORDER_2_PENDING -> TRANSITION_PHASE_PENDING
+  ORDER_2_PENDING = 'order_2_pending', // Represents generating transition consequences
+  ORDER_2_REVIEW = 'order_2_review',   // Review transition consequences
+  // ORDER_3_PENDING -> STABILIZATION_PHASE_PENDING
+  ORDER_3_PENDING = 'order_3_pending', // Represents generating stabilization consequences
+  ORDER_3_REVIEW = 'order_3_review',   // Review stabilization consequences
   GENERATING_SUMMARY = 'generating_summary',
   FINAL_REVIEW = 'final_review',
   CONSOLIDATION_PENDING = 'consolidation_pending',
@@ -215,8 +249,8 @@ export interface GoalOption {
   id: string;
   title: string;
   description: string;
-  promptLabel: string; // Main label for the assertion form when this goal is chosen
-  placeholder: string; // Example assertion text / placeholder for the textarea
+  promptLabel: string;
+  placeholder: string;
   icon?: React.ElementType;
 }
 
