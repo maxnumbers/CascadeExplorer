@@ -2,7 +2,7 @@
 "use client";
 
 import type { ImpactNode, StructuredConcept, SystemModel, TensionAnalysisOutput, SystemStock, SystemAgent, SystemIncentive, StockToStockFlow, CompetingStakeholderResponse, ResourceConstraint, IdentifiedTradeOff } from '@/types/cascade';
-import { VALIDITY_OPTIONS, CORE_ASSERTION_ID } from '@/types/cascade'; // Added CORE_ASSERTION_ID
+import { VALIDITY_OPTIONS, CORE_ASSERTION_ID } from '@/types/cascade';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,7 +31,7 @@ interface NodeDetailPanelProps {
   onClose: () => void;
   onUpdateValidity: (nodeId: string, validity: 'high' | 'medium' | 'low') => void;
   advancedViewEnabled?: boolean;
-  masterSystemModel?: SystemModel | null; // New prop for the latest overall system model
+  masterSystemModel?: SystemModel | null;
 }
 
 const renderAdvancedSystemModel = (systemModel: SystemModel) => {
@@ -189,19 +189,17 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
 
   const nodeTypeDisplay = node.nodeSystemType;
 
-  // Determine which system model to use for display
-  const systemModelForDisplay = (node.id === CORE_ASSERTION_ID && masterSystemModel) ? masterSystemModel : node.properties?.systemModel as SystemModel | undefined;
+  const isCoreNode = node.id === CORE_ASSERTION_ID;
+  const systemModelForDisplay = (isCoreNode && masterSystemModel)
+    ? masterSystemModel
+    : (node.properties?.systemModel as SystemModel | undefined);
   
-  // Access structured data: Use masterSystemModel for CORE_ASSERTION specific properties if available and advancedView is on
-  const fullAssertionText = (node.id === CORE_ASSERTION_ID && masterSystemModel) 
-    ? node.properties?.fullAssertionText // Prefer specific prop if set, else derive from node.description for core
-    : (node.nodeSystemType === 'CORE_ASSERTION' ? node.description : undefined);
+  const fullAssertionText = isCoreNode
+    ? node.properties?.fullAssertionText || node.description // Fallback to node.description for core assertion's full text
+    : undefined;
 
-  // For tensionAnalysis and initialSystemStatesSummary, these are usually tied to the initial setup.
-  // If masterSystemModel is provided for CORE_ASSERTION_ID, it implies we are in an advanced view context
-  // where these top-level properties from the node itself are still relevant.
-  const tensionAnalysis = node.properties?.tensionAnalysis as TensionAnalysisOutput | undefined;
-  const initialSystemStatesSummary = node.properties?.initialSystemStatesSummary as string | undefined;
+  const tensionAnalysis = isCoreNode ? node.properties?.tensionAnalysis as TensionAnalysisOutput | undefined : undefined;
+  const initialSystemStatesSummary = isCoreNode ? node.properties?.initialSystemStatesSummary as string | undefined : undefined;
   
   const keyConcepts: StructuredConcept[] = node.keyConcepts || (node.properties?.keyConcepts as StructuredConcept[]) || [];
   const attributes: string[] = node.attributes || (node.properties?.attributes as string[]) || [];
@@ -242,14 +240,14 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
               <p id="reasoning" className="text-sm text-muted-foreground whitespace-pre-wrap">{node.reasoning}</p>
             </div>
 
-            {node.nodeSystemType === 'CORE_ASSERTION' && fullAssertionText && node.description !== fullAssertionText && (
+            {isCoreNode && fullAssertionText && node.description !== fullAssertionText && (
                 <div className="space-y-1 border-t border-border pt-3 mt-3">
                     <Label className="font-semibold text-primary flex items-center"><FileText className="w-4 h-4 mr-2 text-accent"/>Full Original Assertion Text</Label>
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{fullAssertionText}</p>
                 </div>
             )}
             
-            {advancedViewEnabled && node.nodeSystemType === 'CORE_ASSERTION' && (
+            {advancedViewEnabled && isCoreNode && (
               <>
                 {initialSystemStatesSummary && (
                   <div className="space-y-1 border-t border-border pt-3 mt-3">
@@ -257,9 +255,13 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">{initialSystemStatesSummary}</p>
                   </div>
                 )}
-                {systemModelForDisplay && ( // Use systemModelForDisplay here
+                {systemModelForDisplay && ( 
                   <div className="space-y-1 border-t border-border pt-3 mt-3">
-                      <Label className="font-semibold text-primary flex items-center"><TrendingUp className="w-4 h-4 mr-2 text-accent"/>Advanced: System Model Details (Live States)</Label>
+                      <Label className="font-semibold text-primary flex items-center">
+                        <TrendingUp className="w-4 h-4 mr-2 text-accent"/>
+                        Advanced: System Model Details 
+                        {systemModelForDisplay === masterSystemModel ? " (Live States)" : " (Initial Snapshot)"}
+                      </Label>
                       <div className="mt-1 p-2 border border-input rounded-md bg-background/10">
                         {renderAdvancedSystemModel(systemModelForDisplay)}
                       </div>
@@ -275,7 +277,6 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
                 )}
               </>
             )}
-
 
             {keyConcepts && Array.isArray(keyConcepts) && keyConcepts.length > 0 && (
               <div className="space-y-1 border-t border-border pt-3 mt-3">
@@ -348,3 +349,5 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
   );
 }
 
+
+    
