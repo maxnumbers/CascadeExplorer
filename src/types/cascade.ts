@@ -3,11 +3,8 @@ import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
 import { z } from 'zod';
 // Import ReflectAssertionOutput type from its flow file
 import type { ReflectAssertionOutput as AIReflectAssertionOutputOriginal } from '@/ai/flows/assertion-reflection';
-// Import types for the new generateImpactsByOrder flow
-// AIGenerateImpactsByOrderInputOriginal will be the TypeScript type z.infer<typeof GeneratePhaseConsequencesInputSchema>
-// AIGenerateImpactsByOrderOutputOriginal will be the TypeScript type z.infer<typeof GeneratePhaseConsequencesOutputSchema> (from this file itself)
-// import type { GeneratePhaseConsequencesInput as AIGenerateImpactsByOrderInputOriginal } from '@/ai/flows/generate-impacts-by-order';
 
+export const CORE_ASSERTION_ID = 'core-assertion'; // Exporting this
 
 export const StructuredConceptSchema = z.object({
   name: z.string().describe("The name of the key concept or entity."),
@@ -63,7 +60,7 @@ export const ImpactSchema = z.object({
   keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
   causalReasoning: z.string().optional().describe('Explanation of why this impact is a plausible consequence of its preceding impacts and current system state. For first-phase impacts, this explains their link to the initial assertion and state.'),
-  // 'order' field is added in ImpactNode, not in the base ImpactSchema for AI
+  order: z.enum(['0','1', '2', '3']).optional().describe("The hierarchical order (0 for core, 1 for Initial, 2 for Transition, 3 for Stabilization) this impact belongs to. This is often set programmatically rather than by AI for new impacts."),
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
@@ -176,8 +173,6 @@ export type InferInitialQualitativeStateOutput = z.infer<typeof InferInitialQual
 
 
 // For generateImpactsByOrder flow (conceptually GeneratePhaseConsequences)
-// AIGenerateImpactsByOrderInputOriginal is a TypeScript type: z.infer<typeof GeneratePhaseConsequencesInputSchema>
-// It has fields: assertionText, targetPhase, parentImpacts?, currentSystemQualitativeStates, tensionAnalysis?, systemModel
 export type AIGenerateImpactsByOrderInput = {
   assertionText: string;
   targetPhase: '1' | '2' | '3';

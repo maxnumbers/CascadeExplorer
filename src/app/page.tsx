@@ -230,13 +230,14 @@ export default function CascadeExplorerPage() {
     };
   }, []);
 
+
  const handleIdentifyTensions = useCallback(async (
-    currentReflectionForTensions: AIReflectAssertionOutput, // Use a specifically named param
+    currentReflectionForTensions: AIReflectAssertionOutput,
     assertionTextForTensions: string
   ) => {
-    if (!currentReflectionForTensions.systemModel) { // systemModel is now guaranteed by AIReflectAssertionOutput type, but good to check
+    if (!currentReflectionForTensions?.systemModel) {
         toast({ title: "Missing System Model", description: "Cannot identify tensions without a system model.", variant: "destructive" });
-        setUiStep(ExplorerStep.REFLECTION_REVIEW);
+        setUiStep(ExplorerStep.INITIAL_STATE_REVIEW); // Revert to a logical previous step
         return;
     }
     setUiStep(ExplorerStep.TENSION_ANALYSIS_PENDING);
@@ -245,7 +246,7 @@ export default function CascadeExplorerPage() {
     try {
         const tensionInput: TensionAnalysisInput = {
             assertionText: assertionTextForTensions,
-            systemModel: currentReflectionForTensions.systemModel, // This model includes qualitative states
+            systemModel: currentReflectionForTensions.systemModel,
         };
         const result = await identifyTensions(tensionInput);
         setTensionAnalysisResult(result);
@@ -267,7 +268,7 @@ export default function CascadeExplorerPage() {
   const handleConfirmReflectionAndInferInitialStates = useCallback(async () => {
     if (!reflectionResult || !currentAssertionText || !reflectionResult.systemModel) {
         toast({ title: "Missing Context", description: "Cannot infer initial states without a confirmed assertion and system model.", variant: "destructive" });
-        setUiStep(ExplorerStep.REFLECTION_REVIEW);
+        setUiStep(ExplorerStep.REFLECTION_REVIEW); // Stay or revert to reflection review
         return;
     }
     setUiStep(ExplorerStep.INFERRING_INITIAL_STATE);
@@ -278,12 +279,11 @@ export default function CascadeExplorerPage() {
         };
         const stateInferenceResult = await inferInitialQualitativeStates(inferInput);
         
-        // Update reflectionResult with the system model that now includes qualitative states
         const updatedReflectionWithStates = { 
             ...reflectionResult, 
             systemModel: stateInferenceResult.systemModelWithQualitativeStates 
         };
-        setReflectionResult(updatedReflectionWithStates);
+        setReflectionResult(updatedReflectionWithStates); // This contains the model with initial states
         setInitialSystemStatesSummary(stateInferenceResult.initialStatesSummary);
 
         const initialStates: Record<string, string> = {};
@@ -292,11 +292,11 @@ export default function CascadeExplorerPage() {
                 initialStates[stock.name] = stock.qualitativeState;
             }
         });
-        setCurrentSystemQualitativeStates(initialStates);
-        setUiStep(ExplorerStep.INITIAL_STATE_REVIEW); // New step after inference
+        setCurrentSystemQualitativeStates(initialStates); // Set the baseline qualitative states
         
-        // Pass the updated reflection (which contains the model with states) and current assertion text
+        // Proceed to tension analysis using the model that now has initial states
         await handleIdentifyTensions(updatedReflectionWithStates, currentAssertionText);
+        // uiStep will be set by handleIdentifyTensions (TENSION_ANALYSIS_PENDING then TENSION_ANALYSIS_REVIEW or back)
 
     } catch (error: any) {
         console.error("Error inferring initial qualitative states:", error);
@@ -318,8 +318,8 @@ export default function CascadeExplorerPage() {
         return;
     }
 
-    const coreAssertionNode = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
-    const currentTensionAnalysisToUse = tensionAnalysisResult || coreAssertionNode?.properties?.tensionAnalysis;
+    const coreNodeForProps = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
+    const currentTensionAnalysisToUse = tensionAnalysisResult || coreNodeForProps?.properties?.tensionAnalysis;
 
 
     if (targetPhase === '1' && !currentTensionAnalysisToUse) {
@@ -450,6 +450,7 @@ export default function CascadeExplorerPage() {
             ...result.updatedSystemQualitativeStates 
         };
         setCurrentSystemQualitativeStates(newQualitativeStates);
+        
         // Update reflectionResult.systemModel.stocks with new qualitative states
         setReflectionResult(prev => {
             if (!prev || !prev.systemModel) return prev;
@@ -818,7 +819,7 @@ export default function CascadeExplorerPage() {
       case ExplorerStep.INFERRING_INITIAL_STATE: return commonLoading("AI is inferring initial system states...");
       
       case ExplorerStep.REFLECTION_REVIEW: 
-      case ExplorerStep.INITIAL_STATE_REVIEW: // Added this case
+      case ExplorerStep.INITIAL_STATE_REVIEW:
         if (!reflectionResult) return commonLoading("Loading reflection...");
         const systemModelForDisplay = reflectionResult.systemModel; 
         const currentInitialStatesSummary = initialSystemStatesSummary; 
@@ -867,8 +868,6 @@ export default function CascadeExplorerPage() {
                         </Button>
                     </>
                 )}
-                {/* Button to proceed from INITIAL_STATE_REVIEW to TENSION_ANALYSIS_PENDING would be here if handleIdentifyTensions wasn't auto-called. */}
-                {/* For now, INITIAL_STATE_REVIEW automatically proceeds to TENSION_ANALYSIS_PENDING via handleConfirmReflectionAndInferInitialStates->handleIdentifyTensions */}
             </CardFooter>
           </Card>
         );
@@ -1023,6 +1022,7 @@ export default function CascadeExplorerPage() {
         onClose={() => setIsNodePanelOpen(false)} 
         onUpdateValidity={handleUpdateValidity} 
         advancedViewEnabled={advancedViewEnabled}
+        masterSystemModel={reflectionResult?.systemModel}
       />
       <footer className="mt-12 text-center text-sm text-muted-foreground"><p>&copy; {new Date().getFullYear()} Cascade Explorer. Powered by Firebase Studio &amp; Genkit.</p></footer>
     </div>

@@ -2,7 +2,7 @@
 "use client";
 
 import type { ImpactNode, StructuredConcept, SystemModel, TensionAnalysisOutput, SystemStock, SystemAgent, SystemIncentive, StockToStockFlow, CompetingStakeholderResponse, ResourceConstraint, IdentifiedTradeOff } from '@/types/cascade';
-import { VALIDITY_OPTIONS } from '@/types/cascade';
+import { VALIDITY_OPTIONS, CORE_ASSERTION_ID } from '@/types/cascade'; // Added CORE_ASSERTION_ID
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -31,6 +31,7 @@ interface NodeDetailPanelProps {
   onClose: () => void;
   onUpdateValidity: (nodeId: string, validity: 'high' | 'medium' | 'low') => void;
   advancedViewEnabled?: boolean;
+  masterSystemModel?: SystemModel | null; // New prop for the latest overall system model
 }
 
 const renderAdvancedSystemModel = (systemModel: SystemModel) => {
@@ -172,7 +173,7 @@ const renderAdvancedTensionAnalysis = (tensionAnalysis: TensionAnalysisOutput) =
 };
 
 
-export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advancedViewEnabled }: NodeDetailPanelProps): JSX.Element | null {
+export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advancedViewEnabled, masterSystemModel }: NodeDetailPanelProps): JSX.Element | null {
   if (!node) return null;
 
   const handleValidityChange = (newValidity: string) => {
@@ -188,9 +189,17 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
 
   const nodeTypeDisplay = node.nodeSystemType;
 
-  // Access structured data directly from node properties or top-level fields
-  const fullAssertionText = node.properties?.fullAssertionText || (node.nodeSystemType === 'CORE_ASSERTION' ? node.description : undefined);
-  const systemModel = node.properties?.systemModel as SystemModel | undefined;
+  // Determine which system model to use for display
+  const systemModelForDisplay = (node.id === CORE_ASSERTION_ID && masterSystemModel) ? masterSystemModel : node.properties?.systemModel as SystemModel | undefined;
+  
+  // Access structured data: Use masterSystemModel for CORE_ASSERTION specific properties if available and advancedView is on
+  const fullAssertionText = (node.id === CORE_ASSERTION_ID && masterSystemModel) 
+    ? node.properties?.fullAssertionText // Prefer specific prop if set, else derive from node.description for core
+    : (node.nodeSystemType === 'CORE_ASSERTION' ? node.description : undefined);
+
+  // For tensionAnalysis and initialSystemStatesSummary, these are usually tied to the initial setup.
+  // If masterSystemModel is provided for CORE_ASSERTION_ID, it implies we are in an advanced view context
+  // where these top-level properties from the node itself are still relevant.
   const tensionAnalysis = node.properties?.tensionAnalysis as TensionAnalysisOutput | undefined;
   const initialSystemStatesSummary = node.properties?.initialSystemStatesSummary as string | undefined;
   
@@ -248,11 +257,11 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">{initialSystemStatesSummary}</p>
                   </div>
                 )}
-                {systemModel && (
+                {systemModelForDisplay && ( // Use systemModelForDisplay here
                   <div className="space-y-1 border-t border-border pt-3 mt-3">
-                      <Label className="font-semibold text-primary flex items-center"><TrendingUp className="w-4 h-4 mr-2 text-accent"/>Advanced: System Model Details</Label>
+                      <Label className="font-semibold text-primary flex items-center"><TrendingUp className="w-4 h-4 mr-2 text-accent"/>Advanced: System Model Details (Live States)</Label>
                       <div className="mt-1 p-2 border border-input rounded-md bg-background/10">
-                        {renderAdvancedSystemModel(systemModel)}
+                        {renderAdvancedSystemModel(systemModelForDisplay)}
                       </div>
                   </div>
                 )}
@@ -338,3 +347,4 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
     </Dialog>
   );
 }
+
