@@ -21,7 +21,7 @@ import type { AIGenerateImpactsByOrderInput as GeneratePhaseConsequencesInputTyp
 const GeneratePhaseConsequencesInputSchema = z.object({
   assertionText: z.string().describe('The initial user assertion or idea for overall context.'),
   targetPhase: z.enum(['1', '2', '3']).describe("The phase of impacts to generate ('1' for Initial Consequences, '2' for Transition Phase, '3' for Stabilization Phase)."),
-  parentImpacts: z.array(ImpactSchema).optional().describe('Impacts from the previous phase that these new impacts will stem from. Required for phase 2 or 3 if following a chain.'),
+  parentImpacts: z.array(ImpactSchema).optional().describe('Impacts from the previous phase that these new impacts will stem from. If an impact is a confluence of multiple parents, all should be listed here. For Phase 1, this might be empty.'),
   currentSystemQualitativeStates: z.record(z.string()).describe("Current qualitative states of all system stocks (e.g., {'Employee Trust': 'Moderate'})."),
   tensionAnalysis: TensionAnalysisOutputSchema.optional().describe('Previously identified system tensions to consider for realism.'),
   systemModel: SystemModelSchema.describe("The full system model (stocks, agents, incentives, flows) for context.")
@@ -54,7 +54,7 @@ const phasePrompt = ai.definePrompt({
 Overall Assertion: "{{assertionText}}"
 
 Full System Model for Context:
-Stocks: {{#each systemModel.stocks}} - {{name}} (Initial State: {{qualitativeState}}){{/each}}
+Stocks: {{#each systemModel.stocks}} - {{name}} (Initial State: {{lookup ../currentSystemQualitativeStates name}}){{/each}}
 Agents: {{#each systemModel.agents}} - {{name}}{{/each}}
 (Incentives and flows also exist in the model)
 
@@ -79,25 +79,28 @@ We are generating consequences for:
   Number of distinct consequences to generate: 3-5.
 {{/if}}
 {{#if isPhase2}}**Phase 2: Transition Phase Consequences** (Effects stemming from Initial Consequences, considering evolving system states and tensions).
-  Parent Impacts from Phase 1:
+  Parent Impacts from Phase 1 (these are the direct influences for this phase's consequences):
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
-  Number of distinct consequences to generate per parent: 2-3.
+  Number of distinct consequences to generate: 2-3 overall for this phase, potentially linking to one or more of the provided parent impacts.
 {{/if}}
 {{#if isPhase3}}**Phase 3: Stabilization Phase Consequences** (Longer-term shifts and emergent system behaviors as it moves towards new equilibriums).
-  Parent Impacts from Phase 2:
+  Parent Impacts from Phase 2 (these are the direct influences for this phase's consequences):
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
-  Number of distinct consequences to generate per parent: 1-2.
+  Number of distinct consequences to generate: 1-2 overall for this phase, potentially linking to one or more of the provided parent impacts.
 {{/if}}
 
 For each consequence you generate (to be included in the 'generatedImpacts' array):
 1.  **Impact Definition**:
     *   Assign a unique \`id\` (e.g., impact-{{targetPhase}}-{index}).
     *   Provide a concise \`label\` (2-3 lines max).
-    *   Provide a detailed \`description\`. This description MUST explain how the consequence arises from its parent (or the assertion for Phase 1) AND how it is influenced by the \`currentSystemQualitativeStates\` and any relevant \`tensionAnalysis\`.
+    *   Provide a detailed \`description\`. This description MUST explain how the consequence arises from its parent(s) (or the assertion for Phase 1) AND how it is influenced by the \`currentSystemQualitativeStates\` and any relevant \`tensionAnalysis\`.
     *   Assess its \`validity\` ('high', 'medium', 'low') and provide \`reasoning\` for this, referencing system states and tensions.
     *   Include \`keyConcepts\` (2-4, name/type objects) and \`attributes\` (1-2 strings).
-    *   Provide clear \`causalReasoning\` linking to its parent, system state, and tensions.
-    *   **CRITICAL for Phase 2 & 3**: Include the \`parentId\` field, specifying the ID of the specific impact from the preceding phase.
+    *   Provide clear \`causalReasoning\` linking to its parent(s), system state, and tensions.
+    *   **CRITICAL for Phase 2 & 3**: Include the \`parentIds\` field. This MUST be an ARRAY of strings.
+        *   If this consequence is a direct result of ONE specific impact from the preceding phase (listed in 'Parent Impacts from Phase X' above), \`parentIds\` should be an array containing that single parent impact's ID (e.g., \`["impact-1-a"]\`).
+        *   If this consequence is a result of the confluence or combination of MULTIPLE specific impacts from the preceding phase, \`parentIds\` MUST be an array containing all relevant parent impact IDs (e.g., \`["impact-1-a", "impact-1-b"]\`). Ensure these IDs are from the 'Parent Impacts from Phase X' list.
+        *   If this is a Phase 1 impact, \`parentIds\` can be an empty array or omitted (it will be linked to the core assertion).
 2.  **Individual Impact's Effect on System State**:
     *   Based on THIS specific consequence, determine how the qualitative state of one or more key stocks in the \`systemModel\` would change.
     *   Document these changes internally for your aggregation step. (You will provide a cumulative \`updatedSystemQualitativeStates\` object later, or omit it if no states change overall).
@@ -115,6 +118,7 @@ For the 'updatedSystemQualitativeStates' field in your final JSON output:
 Return ALL identified feedback loop insights from ALL impacts generated in THIS call in the 'feedbackLoopInsights' array.
 
 Ensure all generated impacts remain directly relevant to the overall assertion's domain.
+Ensure \`parentIds\` is always an array of strings if present, even if it contains only one ID.
 `,
 });
 
@@ -144,8 +148,6 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
       console.error('Generate phase consequences prompt did not return an output object.', result);
       return { 
         generatedImpacts: [], 
-        // Return current states as a fallback, AI might have just failed to produce output
-        // updatedSystemQualitativeStates: input.currentSystemQualitativeStates, // Omit as per new strategy
         feedbackLoopInsights: [] 
       };
     }
@@ -162,13 +164,18 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
         
         let isValidMap = true;
         for (const key in result.output.updatedSystemQualitativeStates) {
-          if (typeof result.output.updatedSystemQualitativeStates[key] !== 'string') {
-            isValidMap = false;
-            break;
+          if (Object.prototype.hasOwnProperty.call(result.output.updatedSystemQualitativeStates, key)) {
+            if (typeof result.output.updatedSystemQualitativeStates[key] !== 'string') {
+              isValidMap = false;
+              break;
+            }
           }
         }
-        if (isValidMap) {
+        if (isValidMap && Object.keys(result.output.updatedSystemQualitativeStates).length > 0) {
           validatedUpdatedStates = result.output.updatedSystemQualitativeStates as Record<string, string>;
+        } else if (Object.keys(result.output.updatedSystemQualitativeStates).length === 0) {
+          // AI returned an empty object, treat as omitted
+          validatedUpdatedStates = undefined;
         } else {
           console.warn('AI provided updatedSystemQualitativeStates but it was not a Record<string, string>. Ignoring.', result.output.updatedSystemQualitativeStates);
         }
@@ -178,16 +185,20 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
     }
     
     const output: GeneratePhaseConsequencesOutput = {
-        generatedImpacts: result.output.generatedImpacts || [],
+        generatedImpacts: (result.output.generatedImpacts || []).map(impact => ({
+            ...impact,
+            parentIds: impact.parentIds || (impact.parentId ? [impact.parentId] : []), // Ensure parentIds is an array, migrate parentId if present
+            parentId: undefined // Remove old parentId field
+        })),
         updatedSystemQualitativeStates: validatedUpdatedStates, 
         feedbackLoopInsights: result.output.feedbackLoopInsights || [],
     };
     
-    // Basic validation for parentId on phase 2/3 impacts
+    // Basic validation for parentIds on phase 2/3 impacts
     if (input.targetPhase === '2' || input.targetPhase === '3') {
         output.generatedImpacts.forEach(impact => {
-            if (!impact.parentId) {
-                console.warn(`Impact "${impact.label}" in phase ${input.targetPhase} is missing a parentId.`);
+            if (!impact.parentIds || impact.parentIds.length === 0) {
+                console.warn(`Impact "${impact.label}" in phase ${input.targetPhase} is missing parentIds or has an empty parentIds array.`);
             }
         });
     }
@@ -195,3 +206,4 @@ const generatePhaseConsequencesFlow = ai.defineFlow(
     return output;
   }
 );
+

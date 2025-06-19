@@ -221,7 +221,7 @@ export default function CascadeExplorerPage() {
         description: node.description,
         validity: node.validity,
         reasoning: node.reasoning,
-        parentId: node.parentId,
+        parentIds: node.parentIds || [], // Ensure parentIds is an array
         keyConcepts: keyConcepts,
         attributes: attributes,
         causalReasoning: node.causalReasoning,
@@ -229,7 +229,7 @@ export default function CascadeExplorerPage() {
   }, []);
 
 
- const handleIdentifyTensions = useCallback(async (
+  const handleIdentifyTensions = useCallback(async (
     currentReflectionForTensions: AIReflectAssertionOutput,
     assertionTextForTensions: string
   ) => {
@@ -270,7 +270,7 @@ export default function CascadeExplorerPage() {
         return;
     }
     setUiStep(ExplorerStep.INFERRING_INITIAL_STATE);
-    setPreviousSystemQualitativeStates(null); // Reset previous states before new inference cycle
+    setPreviousSystemQualitativeStates(null); 
 
     try {
         const inferInput: InferInitialQualitativeStateInput = {
@@ -344,7 +344,7 @@ export default function CascadeExplorerPage() {
 
     setUiStep(currentLoadingStep);
     setConsolidationSuggestions(null);
-    setPreviousSystemQualitativeStates(currentSystemQualitativeStates); // Capture states before AI call
+    setPreviousSystemQualitativeStates(currentSystemQualitativeStates); 
 
     try {
       const aiInput: AIGenerateImpactsByOrderInput = {
@@ -364,8 +364,10 @@ export default function CascadeExplorerPage() {
                                  impact.description && impact.description.trim() !== "" &&
                                  impact.validity &&
                                  impact.reasoning && impact.reasoning.trim() !== "";
-        const parentIdCheck = targetPhase === '1' || (impact.parentId && impact.parentId.trim() !== "");
-        return hasEssentialFields && parentIdCheck;
+        // For phase 2/3, parentIds should be an array (can be empty if AI finds no direct parent, though unlikely for these phases)
+        // For phase 1, parentIds is optional (or can be empty).
+        const parentIdsCheck = targetPhase === '1' || (impact.parentIds !== undefined && Array.isArray(impact.parentIds));
+        return hasEssentialFields && parentIdsCheck;
       });
 
       const newNodesFromAI: ImpactNode[] = validGeneratedImpacts.map(impact => ({
@@ -374,7 +376,7 @@ export default function CascadeExplorerPage() {
         description: impact.description,
         validity: impact.validity,
         reasoning: impact.reasoning,
-        parentId: impact.parentId, 
+        parentIds: impact.parentIds || [], 
         keyConcepts: impact.keyConcepts || [],
         attributes: impact.attributes || [],
         causalReasoning: impact.causalReasoning,
@@ -387,39 +389,40 @@ export default function CascadeExplorerPage() {
       }));
       
       const newLinksGeneratedThisStep: ImpactLink[] = [];
-      const finalNewNodesWithUpdatedParentIds: ImpactNode[] = [];
+      const finalNewNodesWithUpdatedParentIds: ImpactNode[] = []; // Renamed for clarity, but it's the same list
 
-      if (targetPhase === '1') {
-          const coreNodeForLinking = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
-          if (coreNodeForLinking) {
-              newNodesFromAI.forEach(newNode => {
-                  const nodeWithParent = { ...newNode, parentId: CORE_ASSERTION_ID };
-                  finalNewNodesWithUpdatedParentIds.push(nodeWithParent);
-                  newLinksGeneratedThisStep.push({ source: CORE_ASSERTION_ID, target: nodeWithParent.id });
+      newNodesFromAI.forEach(newNode => {
+          finalNewNodesWithUpdatedParentIds.push(newNode); // Add the node itself
+          if (newNode.parentIds && newNode.parentIds.length > 0) {
+              newNode.parentIds.forEach(aiParentId => {
+                  const parentNodeFromGraph = allImpactNodesRef.current.find(n => n.id === aiParentId && n.order === parseInt(targetPhase, 10) - 1);
+                  if (parentNodeFromGraph) {
+                      newLinksGeneratedThisStep.push({ source: parentNodeFromGraph.id, target: newNode.id });
+                  } else {
+                      // Attempt to find a fallback from the initially provided parentNodesForLinking if AI hallucinated an ID
+                      const fallbackParentNode = parentNodesForLinking.find(p => p.id === aiParentId);
+                      if (fallbackParentNode) {
+                           newLinksGeneratedThisStep.push({ source: fallbackParentNode.id, target: newNode.id });
+                           toast({ title: "Linking Notice", description: `Impact "${newNode.label}" linked to AI-provided parent "${aiParentId}" from available context.`, variant: "default", duration: 7000 });
+                      } else {
+                          toast({ title: "Orphaned Link Attempt", description: `Impact "${newNode.label}" could not link to parent "${aiParentId}" as it was not found in the previous phase or context.`, variant: "destructive", duration: 7000 });
+                      }
+                  }
               });
+          } else if (targetPhase === '1') {
+              // Phase 1 impacts without explicit parentIds from AI link to CORE_ASSERTION
+              newLinksGeneratedThisStep.push({ source: CORE_ASSERTION_ID, target: newNode.id });
+              newNode.parentIds = [CORE_ASSERTION_ID]; // Explicitly set for data consistency
+          } else if (newNode.parentIds?.length === 0 && targetPhase > '1' && parentNodesForLinking.length > 0) {
+              // If AI returns empty parentIds for phase 2/3, but we have context parents,
+              // we could try to link to the first context parent as a broad fallback.
+              // This is debatable, but helps avoid complete orphans if AI fails to specify.
+              // For now, let's not auto-link and let it be an orphan if AI says no parents for phase 2/3.
+              // The user's image showed an orphan, so this behavior aligns if parentIds is empty.
+              toast({ title: "No Explicit Parents", description: `Impact "${newNode.label}" (Phase ${targetPhase}) was generated without explicit parent links from AI.`, variant: "default", duration: 7000 });
           }
-      } else if (targetPhase > '1') {
-        newNodesFromAI.forEach(newNode => {
-            const aiParentId = newNode.parentId;
-            let parentNodeFromGraph = allImpactNodesRef.current.find(n => n.id === aiParentId && n.order === parseInt(targetPhase,10) - 1);
-            
-            if (parentNodeFromGraph) {
-                finalNewNodesWithUpdatedParentIds.push(newNode);
-                newLinksGeneratedThisStep.push({ source: parentNodeFromGraph.id, target: newNode.id });
-            } else {
-                if (parentNodesForLinking.length > 0) {
-                    const fallbackParent = parentNodesForLinking[0]; 
-                    const nodeWithFallbackParent = { ...newNode, parentId: fallbackParent.id };
-                    finalNewNodesWithUpdatedParentIds.push(nodeWithFallbackParent);
-                    newLinksGeneratedThisStep.push({ source: fallbackParent.id, target: nodeWithFallbackParent.id });
-                    toast({ title: "Linking Fallback", description: `Impact "${newNode.label}" used fallback parent as AI-provided parent was invalid.`, variant: "default", duration: 7000 });
-                } else {
-                    finalNewNodesWithUpdatedParentIds.push(newNode); 
-                    toast({ title: "Orphaned Impact", description: `Impact "${newNode.label}" could not be linked as AI-provided parent was invalid and no fallback parent was available.`, variant: "destructive", duration: 7000 });
-                }
-            }
-        });
-      }
+      });
+
 
       setAllImpactNodes(prevNodes => {
         const nodeMap = new Map(prevNodes.map(n => [n.id, n]));
@@ -477,7 +480,7 @@ export default function CascadeExplorerPage() {
       toast({ title: "Missing Context", description: "Cannot generate impacts without confirmed assertion, system model with qualitative states, and tension analysis.", variant: "destructive" });
       return;
     }
-    setPreviousSystemQualitativeStates(currentSystemQualitativeStates); // Capture initial states as "previous" before first impact phase
+    setPreviousSystemQualitativeStates(currentSystemQualitativeStates); 
 
     const coreNode: ImpactNode = {
       id: CORE_ASSERTION_ID,
@@ -490,7 +493,7 @@ export default function CascadeExplorerPage() {
       keyConcepts: reflectionResult.keyConcepts || [],
       attributes: [],
       causalReasoning: undefined,
-      parentId: undefined,
+      parentIds: [], // Core assertion has no parents
       properties: {
         fullAssertionText: currentAssertionText,
         systemModel: reflectionResult.systemModel,
@@ -666,7 +669,7 @@ export default function CascadeExplorerPage() {
         description: suggestedConsolidatedImpact.description,
         validity: suggestedConsolidatedImpact.validity,
         reasoning: suggestedConsolidatedImpact.reasoning,
-        parentId: suggestedConsolidatedImpact.parentId,
+        parentIds: suggestedConsolidatedImpact.parentIds || [], // Use parentIds from suggestion
         keyConcepts: suggestedConsolidatedImpact.keyConcepts || [],
         attributes: suggestedConsolidatedImpact.attributes || [],
         causalReasoning: suggestedConsolidatedImpact.causalReasoning,
@@ -680,58 +683,81 @@ export default function CascadeExplorerPage() {
     let currentNodes = allImpactNodesRef.current;
     let nextNodes = currentNodes.filter(n => !originalImpactIds.includes(n.id)).concat(newGraphNode);
     let finalNewLinks: ImpactLink[] = [];
-    let childLinksToReParent: ImpactLink[] = [];
-    let parentLinksToReParent: ImpactLink[] = [];
-
-    graphLinksRef.current.forEach(link => {
+    
+    // Remove old links related to the original impacts
+    const currentLinks = graphLinksRef.current;
+    currentLinks.forEach(link => {
         const sourceId = typeof link.source === 'object' ? (link.source as ImpactNode).id : String(link.source);
         const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
-        if (originalImpactIds.includes(sourceId) && originalImpactIds.includes(targetId)) {  }
-        else if (originalImpactIds.includes(sourceId)) childLinksToReParent.push({ source: newGraphNode.id, target: targetId });
-        else if (originalImpactIds.includes(targetId)) parentLinksToReParent.push({ source: sourceId, target: newGraphNode.id });
-        else finalNewLinks.push(link);
-    });
-    finalNewLinks.push(...childLinksToReParent, ...parentLinksToReParent);
 
-    const hasParentLink = finalNewLinks.some(l => (typeof l.target === 'object' ? (l.target as ImpactNode).id : String(l.target)) === newGraphNode.id);
-    if (!hasParentLink && newGraphNode.id !== CORE_ASSERTION_ID && newGraphNode.order > 0) {
-        if (newGraphNode.parentId && nextNodes.some(n => n.id === newGraphNode.parentId && n.order === newGraphNode.order - 1)) {
-            finalNewLinks.push({ source: newGraphNode.parentId, target: newGraphNode.id });
+        // If link involves one of the original nodes, don't carry it forward unless re-parented
+        if (originalImpactIds.includes(sourceId) || originalImpactIds.includes(targetId)) {
+            // If link was TO one of the original nodes, new node MIGHT be its new target (if this link is from a valid parent)
+            // If link was FROM one of the original nodes, new node MIGHT be its new source (for children)
         } else {
-            let potentialFallbackParentId: string | undefined;
-            const originalNodesData = suggestion.originalImpactIds.map(id => allImpactNodesRef.current.find(n => n.id === id)).filter(Boolean) as ImpactNode[];
-            for (const origNode of originalNodesData) {
-                if (origNode.parentId && nextNodes.some(n => n.id === origNode.parentId && n.order === newGraphNode.order -1)) {
-                    potentialFallbackParentId = origNode.parentId; break;
-                }
-            }
-            if (potentialFallbackParentId) {
-                newGraphNode.parentId = potentialFallbackParentId;
-                finalNewLinks.push({ source: potentialFallbackParentId, target: newGraphNode.id });
-            } else if (newGraphNode.order === 1) {
-                 const coreParent = nextNodes.find(n => n.id === CORE_ASSERTION_ID);
-                 if (coreParent) {
-                     newGraphNode.parentId = CORE_ASSERTION_ID;
-                     finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
-                 }
-            }
+            finalNewLinks.push(link); // Keep links not involving original nodes
         }
+    });
+
+    // Add links FOR the new consolidated node (from its parents)
+    if (newGraphNode.parentIds) {
+        newGraphNode.parentIds.forEach(pid => {
+            const parentNode = nextNodes.find(n => n.id === pid && n.order === newGraphNode.order - 1);
+            if (parentNode) {
+                finalNewLinks.push({ source: pid, target: newGraphNode.id });
+            } else if (newGraphNode.order === 1 && pid === CORE_ASSERTION_ID) {
+                finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
+            }
+        });
     }
+     if (newGraphNode.order === 1 && (!newGraphNode.parentIds || newGraphNode.parentIds.length === 0)) {
+        newGraphNode.parentIds = [CORE_ASSERTION_ID];
+        finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
+    }
+
+
+    // Re-parent children of the original nodes to the new consolidated node
+    const childrenToReParent: { childId: string, originalParentId: string }[] = [];
+    currentLinks.forEach(link => {
+        const sourceId = typeof link.source === 'object' ? (link.source as ImpactNode).id : String(link.source);
+        const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
+        if (originalImpactIds.includes(sourceId) && !originalImpactIds.includes(targetId)) {
+            childrenToReParent.push({childId: targetId, originalParentId: sourceId });
+        }
+    });
+    
+    childrenToReParent.forEach(({ childId }) => {
+        const childNode = nextNodes.find(n => n.id === childId);
+        if (childNode) {
+            // Update child's parentIds and add new link
+            childNode.parentIds = childNode.parentIds?.filter(pid => !originalImpactIds.includes(pid)); // Remove old parents
+            if (!childNode.parentIds?.includes(newGraphNode.id)) {
+                 childNode.parentIds = [...(childNode.parentIds || []), newGraphNode.id];
+            }
+            finalNewLinks.push({ source: newGraphNode.id, target: childId });
+            // Update the node in nextNodes
+            nextNodes = nextNodes.map(n => n.id === childId ? childNode : n);
+        }
+    });
+    
     nextNodes = nextNodes.map(n => n.id === newGraphNode.id ? newGraphNode : n);
     const uniqueLinks = new Map<string, ImpactLink>();
     finalNewLinks.forEach(link => {
       const src = typeof link.source === 'object' ? (link.source as ImpactNode).id : String(link.source);
       const tgt = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
-      if (src === tgt) return;
+      if (src === tgt) return; // Avoid self-loops from this process
       uniqueLinks.set(`${src}:::${tgt}`, { source: src, target: tgt });
     });
+
     setAllImpactNodes(nextNodes);
     setGraphLinks(Array.from(uniqueLinks.values()));
+
     let dependentSuggestionsRemovedCount = 0;
     setConsolidationSuggestions(prev => {
       if (!prev) return null;
       const suggestionsToKeep = prev.consolidationSuggestions.filter(s => {
-        if (s.consolidatedImpact.id === suggestion.consolidatedImpact.id) return false;
+        if (s.consolidatedImpact.id === suggestion.consolidatedImpact.id) return false; // Remove applied suggestion
+        // Remove suggestions that involved any of the now-removed originalImpactIds
         const isDependent = s.originalImpactIds.some(id => originalImpactIds.includes(id));
         if (isDependent) { dependentSuggestionsRemovedCount++; return false; }
         return true;
@@ -783,7 +809,7 @@ export default function CascadeExplorerPage() {
 
   const renderStepContent = () => {
     const commonLoading = (text: string) => ( <div className="flex justify-center items-center p-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2 text-lg">{text}</p></div>);
-    const nodesForThisRenderPass = allImpactNodes;
+    const nodesForThisRenderPass = allImpactNodesRef.current; // Use ref for up-to-date node list in this render
 
     switch (uiStep) {
       case ExplorerStep.INITIAL:

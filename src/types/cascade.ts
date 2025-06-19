@@ -56,7 +56,7 @@ export const ImpactSchema = z.object({
   description: z.string().describe('Detailed description of the impact, potentially noting how it interacts with system states.'),
   validity: z.enum(['high', 'medium', 'low']).describe('Validity assessment (high/medium/low).'),
   reasoning: z.string().describe('Reasoning for validity assessment.'),
-  parentId: z.string().optional().describe('The ID of the parent impact from the previous order/phase, if applicable.'),
+  parentIds: z.array(z.string()).optional().describe('The IDs of the parent impacts from the previous order/phase. Can be multiple if the impact is a confluence of several parents. If empty for a Phase 1 impact, it links to the core assertion.'),
   keyConcepts: z.array(StructuredConceptSchema).optional().describe('A list of structured key concepts (name, type) central to this specific impact.'),
   attributes: z.array(z.string()).optional().describe('A list of key attributes or defining characteristics of this specific impact.'),
   causalReasoning: z.string().optional().describe('Explanation of why this impact is a plausible consequence of its preceding impacts and current system state. For first-phase impacts, this explains their link to the initial assertion and state.'),
@@ -205,6 +205,7 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
     [key: string]: any;
   };
   originalColor?: string;
+  // parentId is now replaced by parentIds in Impact, so it's inherited
 }
 
 export interface ImpactLink extends SimulationLinkDatum<ImpactNode> {

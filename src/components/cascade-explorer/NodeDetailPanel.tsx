@@ -23,7 +23,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Package, Users, TrendingUp, ArrowRightLeft, ShieldAlert, Info, ThumbsUp, ThumbsDown, Lightbulb, MinusCircle, FileText, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Package, Users, TrendingUp, ArrowRightLeft, ShieldAlert, Info, ThumbsUp, ThumbsDown, Lightbulb, MinusCircle, FileText, ArrowUpCircle, ArrowDownCircle, LinkIcon } from 'lucide-react';
 
 interface NodeDetailPanelProps {
   node: ImpactNode | null;
@@ -254,6 +254,7 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
   const keyConcepts: StructuredConcept[] = node.keyConcepts || (node.properties?.keyConcepts as StructuredConcept[]) || [];
   const attributes: string[] = node.attributes || (node.properties?.attributes as string[]) || [];
   const causalReasoning = node.causalReasoning;
+  const parentIds = node.parentIds || [];
   
   const explicitlyHandledPropertyKeys = ['fullAssertionText', 'systemModel', 'tensionAnalysis', 'initialSystemStatesSummary', 'keyConcepts', 'attributes'];
   
@@ -279,9 +280,18 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
               <p id="description" className="text-sm text-muted-foreground whitespace-pre-wrap">{node.description}</p>
             </div>
 
+            {parentIds.length > 0 && node.order > 0 && (
+              <div className="space-y-1 border-t border-border pt-3 mt-3">
+                <Label className="font-semibold text-primary flex items-center"><LinkIcon className="w-4 h-4 mr-2 text-accent"/>Linked To (Parent IDs)</Label>
+                 <div className="flex flex-wrap gap-1 mt-1">
+                    {parentIds.map((pid, index) => <Badge key={`parent-${index}-${pid}`} variant="outline" className="text-xs">{pid}</Badge>)}
+                </div>
+              </div>
+            )}
+
             {causalReasoning && node.order > 0 && (
                  <div className="space-y-1 border-t border-border pt-3 mt-3">
-                    <Label htmlFor="causalReasoning" className="font-semibold text-primary">Reasoning for Link to Parent</Label>
+                    <Label htmlFor="causalReasoning" className="font-semibold text-primary">Reasoning for Link to Parent(s)</Label>
                     <p id="causalReasoning" className="text-sm text-muted-foreground whitespace-pre-wrap">{causalReasoning}</p>
                 </div>
             )}
@@ -310,7 +320,7 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
                   <div className="space-y-1 border-t border-border pt-3 mt-3">
                       <Label className="font-semibold text-primary flex items-center">
                         <TrendingUp className="w-4 h-4 mr-2 text-accent"/>
-                        Advanced: System Model Details {systemModelLabelSuffix}
+                        Advanced: System Model Details {isCoreNode && masterSystemModel ? "(Live States)" : "(Initial Snapshot)"}
                       </Label>
                       <div className="mt-1 p-2 border border-input rounded-md bg-background/10">
                         {renderAdvancedSystemModel(systemModelForDisplay, previousSystemQualitativeStates)}
