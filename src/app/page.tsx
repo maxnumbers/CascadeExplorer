@@ -3,6 +3,8 @@
 
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { reflectAssertion, type AIReflectAssertionOutput } from '@/ai/flows/assertion-reflection';
 import { inferInitialQualitativeStates, type InferInitialQualitativeStateInput, type InferInitialQualitativeStateOutput } from '@/ai/flows/infer-initial-qualitative-state';
 import { identifyTensions, type TensionAnalysisInput, type TensionAnalysisOutput } from '@/ai/flows/tension-identification';
@@ -24,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info, Settings2, LinkIcon, Package, Users, TrendingUp, ArrowRightLeft, ThumbsUp, ThumbsDown, MinusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info, Settings2, LinkIcon, Package, Users, TrendingUp, ArrowRightLeft, ThumbsUp, ThumbsDown, MinusCircle, ArrowUpCircle, ArrowDownCircle, Copy } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -811,6 +813,25 @@ export default function CascadeExplorerPage() {
     return undefined;
   };
 
+  const handleCopySummary = useCallback(async () => {
+    if (cascadeSummary) {
+      try {
+        await navigator.clipboard.writeText(cascadeSummary);
+        toast({
+          title: "Summary Copied",
+          description: "The narrative summary has been copied to your clipboard.",
+        });
+      } catch (err) {
+        console.error('Failed to copy summary: ', err);
+        toast({
+          title: "Copy Failed",
+          description: "Could not copy the summary to your clipboard.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [cascadeSummary, toast]);
+
   const renderStepContent = () => {
     const commonLoading = (text: string) => ( <div className="flex justify-center items-center p-6"><Loader2 className="h-8 w-8 animate-spin text-primary" /><p className="ml-2 text-lg">{text}</p></div>);
     const nodesForThisRenderPass = allImpactNodesRef.current; 
@@ -962,7 +983,37 @@ export default function CascadeExplorerPage() {
           </div>
           {consolidationSuggestions && consolidationSuggestions.consolidationSuggestions.length > 0 && (<ConsolidationSuggestionsDisplay suggestions={consolidationSuggestions} graphNodes={nodesForThisRenderPass} onApplyConsolidation={handleApplyConsolidation} onDismissSuggestion={handleDismissConsolidation}/>)}
           {cascadeSummary && uiStep === ExplorerStep.FINAL_REVIEW && (
-          <Card className="mt-6 shadow-xl bg-card text-card-foreground"><CardHeader><CardTitle className="text-xl text-primary flex items-center"><FileText className="w-6 h-6 mr-2 text-accent" />System Evolution Narrative</CardTitle></CardHeader><CardContent><div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap">{cascadeSummary}</div></CardContent></Card>
+            <Card className="mt-6 shadow-xl bg-card text-card-foreground">
+              <CardHeader>
+                <CardTitle className="text-xl text-primary flex items-center">
+                  <FileText className="w-6 h-6 mr-2 text-accent" />System Evolution Narrative
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="relative">
+                  {cascadeSummary && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-0 right-0 h-8 w-8 text-muted-foreground hover:text-foreground"
+                      onClick={handleCopySummary}
+                      title="Copy summary text"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-primary prose-strong:text-foreground prose-a:text-accent prose-code:text-sm prose-code:bg-muted prose-code:p-1 prose-code:rounded-sm"
+                    components={{
+                      a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" />
+                    }}
+                  >
+                    {cascadeSummary || "No summary generated."}
+                  </ReactMarkdown>
+                </div>
+              </CardContent>
+            </Card>
           )}</>
         );
       default: return <p className="text-center">Current step: {ExplorerStep[uiStep] || uiStep}.</p>;
