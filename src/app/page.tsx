@@ -34,7 +34,7 @@ const goalOptions: GoalOption[] = [
     title: "Test a Decision",
     description: "See potential outcomes before committing to a choice.",
     promptLabel: "What decision are you considering?",
-    placeholder: "Our company is considering a major shift to invest heavily in renewable energy for all operations within the next 10 years. This involves significant capital expenditure and requires retraining our workforce. The key groups involved are our investors, employees, the local communities where we operate, and various environmental regulatory bodies. The primary aim is to improve our long-term sustainability and significantly reduce our carbon emissions, while being mindful of short-term profit margins and the potential for disruption to operational efficiency during the transition.",
+    placeholder: "Our company is evaluating a major shift: investing heavily in renewable energy for all operations within the next decade. This plan involves significant upfront costs for new infrastructure and requires retraining our existing workforce. Key groups involved include our investors (who are concerned about short-term profitability), employees (who may be anxious about job changes), the local communities where our plants operate (who are interested in environmental impact and job stability), and various environmental regulatory bodies (who will oversee compliance). The main objective is to enhance our long-term sustainability and substantially reduce our carbon footprint, while also trying to manage the impact on immediate profit margins and potential disruptions to operational efficiency during this transition period.",
     icon: HelpCircle,
   },
   {
@@ -42,7 +42,7 @@ const goalOptions: GoalOption[] = [
     title: "Strengthen a Pitch",
     description: "Build an airtight argument for your idea or proposal.",
     promptLabel: "What idea or proposal are you trying to convince someone of?",
-    placeholder: "To revitalize our city's downtown core, we should implement a 'Pedestrian-First' initiative. This would involve converting Main Street into a car-free zone on weekends, investing in public art installations that reflect local culture, and offering tiered tax incentives to encourage unique small businesses to set up shop. The main players are the City Council, existing local business owners (some of whom may resist due to parking concerns), city residents (both downtown and suburban), and an urban planning consultancy. The goal is to boost local economic activity, improve community wellbeing by creating more public space, and enhance the city's cultural vibrancy, while carefully considering impacts on traffic flow in adjacent areas and the accessibility needs of all current business patrons.",
+    placeholder: "To revitalize our city's downtown core, we should implement a 'Pedestrian-First' initiative. This means converting Main Street into a car-free zone on weekends, investing in public art installations that reflect local culture, and offering tiered tax incentives to encourage unique small businesses (like artisan shops and independent cafes) to set up shop. The main parties involved are the City Council (who needs to approve the plan and budget), existing local business owners (some of whom are worried about customer access if parking is reduced), city residents from all neighborhoods (who have opinions on downtown's future), and potentially an urban planning consultancy to help with the design. The goal is to boost local economic activity, improve community wellbeing by creating more attractive public spaces, and enhance the city's cultural vibrancy. We must carefully consider the effects on traffic flow in adjacent areas and ensure continued accessibility for all current business patrons, including those with mobility challenges.",
     icon: Brain,
   },
   {
@@ -50,7 +50,7 @@ const goalOptions: GoalOption[] = [
     title: "Find Blind Spots",
     description: "Uncover hidden risks and unintended consequences of a plan.",
     promptLabel: "What plan, change, or existing situation are you analyzing for risks?",
-    placeholder: "Our tech company plans to launch a new AI-powered social media platform designed for hyper-local community engagement. While the primary goal is rapid user growth and fostering neighborhood connections, we need to thoroughly analyze risks related to user data security, algorithmic fairness in content promotion, the potential for localized misinformation or panic to spread quickly, and the mental well-being of users facing echo chambers. Other involved parties include potential advertisers, regulatory bodies concerned with new media, and existing competitor platforms. We also need to consider the strain on our engineering capacity for moderation tools and the server infrastructure required for real-time geolocation features.",
+    placeholder: "Our tech company plans to launch a new AI-powered social media platform designed for hyper-local community engagement. While the primary goal is rapid user growth and fostering neighborhood connections, we need to thoroughly analyze risks related to: user data security and privacy (especially with location data); algorithmic fairness in how content is promoted or suppressed; the potential for localized misinformation, rumors, or even panic to spread quickly if not moderated effectively; and the mental well-being of users who might face online harassment or feel isolated within echo chambers. Other involved parties include potential advertisers (who want brand safety), regulatory bodies concerned with new media's societal impact, and existing competitor platforms. We also need to realistically assess the strain on our engineering team to build and maintain robust moderation tools and the server infrastructure required for real-time geolocation features at scale.",
     icon: Search,
   },
   {
@@ -58,7 +58,7 @@ const goalOptions: GoalOption[] = [
     title: "Explore an Assertion",
     description: "Conduct a general exploration of an idea's cascading impacts.",
     promptLabel: "Enter your assertion or idea:",
-    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform urban density as parking needs decrease, affect labor markets for professional drivers and related support industries, and change the concept of mobility access for the elderly and disabled. This will significantly impact city planners who manage infrastructure, influence public and private investment in new transport solutions, affect road safety paradigms, and potentially create new business opportunities in logistics and in-car services while displacing existing industries like auto repair and traditional taxi services. Consider the interplay between AV technology developers, national and local regulatory bodies, insurance companies, and public trust in AI systems.",
+    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform how cities are structured as the need for parking spaces decreases. This will also heavily affect labor markets, particularly for professional drivers and related support industries like mechanics and driving schools. Furthermore, it will significantly change the concept of mobility access for the elderly, people with disabilities, and those in remote areas. This technological shift will deeply impact city planners who manage urban infrastructure, influence massive public and private investment in new transport solutions versus maintaining old ones, change road safety paradigms and insurance models, and potentially create a host of new business opportunities in logistics, in-car entertainment, and mobile services, while simultaneously displacing existing industries like auto repair shops and traditional taxi services. We must also consider the interplay between AV technology developers, national and local regulatory bodies who will set safety and operational standards, insurance companies trying to model new risk profiles, and the general public's trust (or mistrust) in complex AI systems controlling vehicles.",
     icon: Target,
   }
 ];
@@ -823,7 +823,7 @@ export default function CascadeExplorerPage() {
           
           <div className="mt-6 pt-4 border-t border-border">
             <h3 className="text-md font-semibold mb-3 text-accent">Or try an example:</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {goalOptions.map((goal) => (
                 <Button 
                   key={goal.id} 
@@ -842,7 +842,7 @@ export default function CascadeExplorerPage() {
                   </div>
                 </Button>
               ))}
-            </div>
+            </div> */}
           </div>
           
           </CardContent></Card>
