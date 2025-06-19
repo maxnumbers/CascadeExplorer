@@ -34,7 +34,7 @@ const goalOptions: GoalOption[] = [
     title: "Test a Decision",
     description: "See potential outcomes before committing to a choice.",
     promptLabel: "What decision are you considering?",
-    placeholder: "Our company is considering a major shift to invest heavily in renewable energy for all operations within the next 10 years. This involves significant capital expenditure and requires retraining our workforce. Key groups involved include our investors, employees, local communities, and environmental NGOs. The primary aim is to improve long-term sustainability and reduce carbon emissions, while being mindful of short-term profit margins and operational efficiency.",
+    placeholder: "Our company is considering a major shift to invest heavily in renewable energy for all operations within the next 10 years. This involves significant capital expenditure and requires retraining our workforce. The key groups involved are our investors, employees, the local communities where we operate, and various environmental regulatory bodies. The primary aim is to improve our long-term sustainability and significantly reduce our carbon emissions, while being mindful of short-term profit margins and the potential for disruption to operational efficiency during the transition.",
     icon: HelpCircle,
   },
   {
@@ -42,7 +42,7 @@ const goalOptions: GoalOption[] = [
     title: "Strengthen a Pitch",
     description: "Build an airtight argument for your idea or proposal.",
     promptLabel: "What idea or proposal are you trying to convince someone of?",
-    placeholder: "To revitalize our city's downtown core, we should implement a 'Pedestrian-First' initiative. This involves converting Main Street into a car-free zone on weekends, investing in public art installations, and offering tax incentives to encourage small businesses. The main players are the City Council, local business owners, city residents, and an urban planning consultancy. The goal is to boost local economic activity, improve community wellbeing, and enhance cultural vibrancy, while considering impacts on traffic and current business models.",
+    placeholder: "To revitalize our city's downtown core, we should implement a 'Pedestrian-First' initiative. This would involve converting Main Street into a car-free zone on weekends, investing in public art installations that reflect local culture, and offering tiered tax incentives to encourage unique small businesses to set up shop. The main players are the City Council, existing local business owners (some of whom may resist due to parking concerns), city residents (both downtown and suburban), and an urban planning consultancy. The goal is to boost local economic activity, improve community wellbeing by creating more public space, and enhance the city's cultural vibrancy, while carefully considering impacts on traffic flow in adjacent areas and the accessibility needs of all current business patrons.",
     icon: Brain,
   },
   {
@@ -50,7 +50,7 @@ const goalOptions: GoalOption[] = [
     title: "Find Blind Spots",
     description: "Uncover hidden risks and unintended consequences of a plan.",
     promptLabel: "What plan, change, or existing situation are you analyzing for risks?",
-    placeholder: "Our tech company plans to launch a new AI-powered social media platform. While the goal is rapid user growth, we need to analyze risks related to user data security, algorithmic fairness, the potential for misinformation spread, and the mental well-being of users. Other involved parties include advertisers, regulatory bodies, and competitor platforms. We also need to consider strain on our engineering capacity and server infrastructure.",
+    placeholder: "Our tech company plans to launch a new AI-powered social media platform designed for hyper-local community engagement. While the primary goal is rapid user growth and fostering neighborhood connections, we need to thoroughly analyze risks related to user data security, algorithmic fairness in content promotion, the potential for localized misinformation or panic to spread quickly, and the mental well-being of users facing echo chambers. Other involved parties include potential advertisers, regulatory bodies concerned with new media, and existing competitor platforms. We also need to consider the strain on our engineering capacity for moderation tools and the server infrastructure required for real-time geolocation features.",
     icon: Search,
   },
   {
@@ -58,7 +58,7 @@ const goalOptions: GoalOption[] = [
     title: "Explore an Assertion",
     description: "Conduct a general exploration of an idea's cascading impacts.",
     promptLabel: "Enter your assertion or idea:",
-    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform urban density, affect labor markets for transportation workers, and change the concept of mobility access. This will impact city planners, influence infrastructure investment, affect road safety, and potentially create new business opportunities while displacing existing industries. Consider the interplay between AV developers, regulatory bodies, and public trust.",
+    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform urban density as parking needs decrease, affect labor markets for professional drivers and related support industries, and change the concept of mobility access for the elderly and disabled. This will significantly impact city planners who manage infrastructure, influence public and private investment in new transport solutions, affect road safety paradigms, and potentially create new business opportunities in logistics and in-car services while displacing existing industries like auto repair and traditional taxi services. Consider the interplay between AV technology developers, national and local regulatory bodies, insurance companies, and public trust in AI systems.",
     icon: Target,
   }
 ];
@@ -183,9 +183,9 @@ export default function CascadeExplorerPage() {
             if (!prev) return null;
             const newSystemModel = result.revisedSystemModel;
             // Preserve existing qualitative states on revised model's stocks if names match
-            const currentQualitativeStates = currentSystemQualitativeStates || {};
+            const currentQualitativeStatesForUpdate = currentSystemQualitativeStates || {};
             const updatedStocksWithStates = newSystemModel.stocks.map(stock => {
-                const existingState = currentQualitativeStates[stock.name];
+                const existingState = currentQualitativeStatesForUpdate[stock.name];
                 return existingState ? { ...stock, qualitativeState: existingState } : stock;
             });
             return { ...prev, systemModel: { ...newSystemModel, stocks: updatedStocksWithStates }};
@@ -823,7 +823,7 @@ export default function CascadeExplorerPage() {
           
           <div className="mt-6 pt-4 border-t border-border">
             <h3 className="text-md font-semibold mb-3 text-accent">Or try an example:</h3>
-            {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {goalOptions.map((goal) => (
                 <Button 
                   key={goal.id} 
@@ -842,7 +842,7 @@ export default function CascadeExplorerPage() {
                   </div>
                 </Button>
               ))}
-            </div> */}
+            </div>
           </div>
           
           </CardContent></Card>

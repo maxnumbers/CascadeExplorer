@@ -254,13 +254,13 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
       nodeElements
         .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
-    
+            
       linkLabelElements
-        .attr("x", d => (((d.source as SystemGraphNode).x || 0) + ((d.target as SystemGraphNode).x || 0)) / 2)
-        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 8));
-        });
-    
-        simulation.alpha(0.8).restart();
+          .attr("x", d => (((d.source as SystemGraphNode).x || 0) + ((d.target as SystemGraphNode).x || 0)) / 2)
+          .attr("y", d => 0)); // Simplified for testing
+    });
+            
+                simulation.alpha(0.8).restart();
 
     const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
         .scaleExtent([0.15, 2.5]) // Adjusted zoom
