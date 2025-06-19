@@ -45,7 +45,7 @@ const reflectAssertionPrompt = ai.definePrompt({
   name: 'reflectAssertionPrompt',
   input: {schema: ReflectAssertionInputSchema},
   output: {schema: ReflectAssertionOutputSchema},
-  prompt: `You are an expert Systems Thinker. Your task is to analyze the user's assertion and provide a structured reflection that includes a basic, interconnected system model relevant to the assertion's core dynamics.
+  prompt: `You are an expert Systems Thinker. Your task is to analyze the user's assertion and provide a structured reflection that includes a rich, interconnected system model relevant to the assertion's core dynamics.
 
 User's Assertion:
 "{{assertion}}"
@@ -55,25 +55,25 @@ Based on this assertion, you must:
 1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
 2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
 3.  **System Model ('systemModel')**: Analyze the assertion to identify components of an interconnected system model. This model must illustrate how the assertion's core idea would impact various elements and how these elements relate to each other.
-    *   **Stocks**: Identify 3-7 key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt', 'Employee Well-being', 'Company Productivity'). For each stock, provide:
+    *   **Stocks**: Identify the key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt', 'Employee Well-being', 'Company Productivity'). Aim for a number that comprehensively covers the core dynamics of the assertion. For each stock, provide:
         *   'name': A concise name for the stock.
         *   'description' (optional): A brief explanation of what this stock represents.
-        *   **Connectivity Requirement**: Every stock MUST be demonstrably part of the system's causal web related to the assertion. This means it must have clear incoming influences (e.g., targeted by an agent's incentive, affected by another stock via a stock-to-stock flow) AND outgoing influences (e.g., it is the source of a stock-to-stock flow influencing another key stock, or its state is a precondition for an agent's action described in an incentive). Do not list stocks that are merely mentioned if they don't participate in the system's dynamics as triggered by the assertion.
-    *   **Agents**: Identify 3-7 key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors', 'Management', 'Employees'). For each agent, provide:
+        *   **Connectivity Requirement**: Every stock MUST be demonstrably part of the system's causal web related to the assertion. It must have clear incoming influences (e.g., targeted by an agent's incentive, affected by another stock via a stock-to-stock flow) AND outgoing influences (e.g., it is the source of a stock-to-stock flow influencing another key stock, or its state is a precondition for an agent's action described in an incentive). Do not list stocks that are merely mentioned if they don't participate in the system's dynamics as triggered by the assertion.
+    *   **Agents**: Identify the key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors', 'Management', 'Employees'). Aim for a number that comprehensively covers the core dynamics of the assertion. For each agent, provide:
         *   'name': A concise name for the agent.
         *   'description' (optional): A brief explanation of this agent's role or nature.
             When identifying agents, consider those central to the assertion and any implied counter-agents. Ensure each agent is linked to the system through at least one incentive.
-    *   **Incentives & Flows (Agent-Stock Interactions)**: Identify 4-7 *significant* incentives. For EACH incentive, ensure the 'targetStockName' is a stock that is clearly affected by the assertion's core mechanisms or is a key mediating factor. The agent's 'resultingFlow' should show how it impacts this stock.
+    *   **Incentives & Flows (Agent-Stock Interactions)**: Identify a comprehensive set of *significant* incentives. For EACH incentive, ensure the 'targetStockName' is a stock that is clearly affected by the assertion's core mechanisms or is a key mediating factor. The agent's 'resultingFlow' should show how it impacts this stock. Provide:
         *   'agentName': The name of an identified agent.
         *   'targetStockName': The name of an identified stock.
         *   'incentiveDescription': Agent's motivation towards the stock.
         *   'resultingFlow': The action or flow driven by the incentive.
-    *   **Stock-to-Stock Flows ('stockToStockFlows')**: Identify 2-5 significant direct influences or flows *between different stocks*. These are crucial for showing how changes in one stock directly impact another, forming the system's internal structure. Examples: 'Increased Employee Well-being' (stock) leads to 'Improved Company Productivity' (stock); 'Increased Company Productivity' (stock) might enable 'Higher Investment in R&D' (stock); 'Strain on Labor Costs' (stock) might negatively impact 'Profit Margins' (stock). For each flow, provide:
+    *   **Stock-to-Stock Flows ('stockToStockFlows')**: Identify a comprehensive set of significant direct influences or flows *between different stocks*. These are *crucial* for showing how changes in one stock directly impact another, forming the system's internal structure and ensuring a non-fragmented model. Examples: 'Increased Employee Well-being' (stock) leads to 'Improved Company Productivity' (stock); 'Increased Company Productivity' (stock) might enable 'Higher Investment in R&D' (stock); 'Strain on Labor Costs' (stock) might negatively impact 'Profit Margins' (stock). For each flow, provide:
         *   'sourceStockName': The source stock.
         *   'targetStockName': The target stock.
         *   'flowDescription': How the source influences the target.
         *   'drivingForceDescription' (optional): Underlying mechanism if not obvious.
-        Ensure these flows help connect the system model cohesively, particularly linking any secondary stocks (like 'Service Quality' if identified) back to the primary stocks affected by the assertion (like 'Company Productivity' or 'Employee Well-being').
+        Ensure these flows help connect the system model cohesively, particularly linking any secondary stocks back to the primary stocks affected by the assertion.
 4.  **General Key Concepts ('keyConcepts')**: Separately, list 2-5 general key concepts mentioned in the assertion.
 5.  **Confirmation Question ('confirmationQuestion')**: Ask a concise question to confirm understanding.
 
@@ -81,7 +81,8 @@ Based on this assertion, you must:
 Before finalizing the 'systemModel' output:
 - Is every stock part of a clear causal chain related to the assertion? Does it have both incoming and outgoing influences within the model (via agent incentives or stock-to-stock flows)?
 - Is every agent linked to the system via at least one incentive involving a core stock?
-- Do the stock-to-stock flows create a more interconnected network, explaining how changes in one area ripple to others, rather than leaving some stocks as endpoints?
+- Do the stock-to-stock flows create a robustly interconnected network, explaining how changes in one area ripple to others, rather than leaving some stocks as endpoints?
+- Is the model comprehensive yet focused? Are there enough connections (incentives and stock-to-stock flows) to demonstrate how the assertion ripples through the system? Avoid isolated 'islands' of stocks or agents.
 - If a stock (e.g., 'Service Quality') seems peripheral, have you explicitly defined how it's influenced by core stocks (e.g., 'Employee Well-being') and how it, in turn, might influence other core stocks or agent behaviors relevant to the assertion?
 - The goal is a tightly-knit system model where the assertion's impact can be traced through multiple interconnected components. If elements are isolated, reconsider their inclusion or add the necessary connecting flows based on plausible interpretations of the assertion. It's better to have a slightly smaller, deeply interconnected model focused on the assertion's core dynamics than a larger one with dangling parts.
 `,

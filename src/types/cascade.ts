@@ -268,7 +268,7 @@ export interface SystemGraphNode extends SimulationNodeDatum {
 export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
   source: string; // ID of source SystemGraphNode
   target: string; // ID of target SystemGraphNode
-  label: string;  // incentiveDescription or flowDescription
-  flow?: string;   // resultingFlow (for agent-stock) or drivingForce (for stock-stock)
-  type: 'incentive' | 'stock-to-stock';
+  label: string;  // Main descriptive label for the link (incentiveDescription or flowDescription)
+  flow?: string;   // Secondary detail (e.g., resultingFlow for incentives, or drivingForceDescription for stock-to-stock)
+  type: 'incentive' | 'stock-to-stock'; // To differentiate link types
 }

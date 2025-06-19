@@ -115,11 +115,14 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
     svg.selectAll("*").remove();
 
     svg.append("svg:defs").selectAll("marker")
-        .data(["end-incentive", "end-stockflow"]) // Different markers if needed
+        .data(["end-arrow"]) // Single arrowhead for all links for now
         .enter().append("svg:marker")
         .attr("id", String)
         .attr("viewBox", "0 -5 10 10")
-        .attr("refX", (d) => d === "end-incentive" ? 22 : 47 ) // Adjust refX for rects
+        .attr("refX", (dLink) => { // dLink is not defined here, this logic needs to be on link
+            // Placeholder: default refX, will be adjusted per link type or node size
+            return 22; // default, to be adjusted for actual node sizes
+        })
         .attr("refY", 0)
         .attr("markerWidth", 6)
         .attr("markerHeight", 6)
@@ -127,6 +130,15 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .append("svg:path")
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", LINK_COLOR);
+    
+    // Calculate refX based on target node type
+    const getRefX = (targetNode: SystemGraphNode | string | undefined) => {
+        const node = typeof targetNode === 'string' ? d3Nodes.find(n => n.id === targetNode) : targetNode;
+        if (node?.type === 'stock') return 47; // rect half-width (90/2) + buffer
+        if (node?.type === 'agent') return 30; // circle radius (28) + buffer
+        return 22; // default
+    };
+
 
     const simulation = d3.forceSimulation<SystemGraphNode>(d3Nodes)
       .force("link", d3.forceLink<SystemGraphNode, SystemGraphLink>(d3Links)
@@ -134,9 +146,9 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .distance(180) // Increased distance
         .strength(0.4)
       )
-      .force("charge", d3.forceManyBody().strength(-600)) // Increased repulsion
+      .force("charge", d3.forceManyBody().strength(-700)) // Increased repulsion for more space
       .force("center", d3.forceCenter(0,0).strength(0.05))
-      .force("collide", d3.forceCollide<SystemGraphNode>().radius(d => (d.type === 'stock' ? 55 : 35)).strength(0.8));
+      .force("collide", d3.forceCollide<SystemGraphNode>().radius(d => (d.type === 'stock' ? 60 : 40)).strength(0.9)); // Increased collision radius
 
     const linkElements = svg.append("g")
       .attr("class", "links")
@@ -146,7 +158,12 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .data(d3Links, (d: any) => `${d.source.id || d.source}-${d.target.id || d.target}`)
       .join("line")
       .attr("stroke-width", 1.5)
-      .attr("marker-end", d => d.type === 'incentive' ? "url(#end-incentive)" : "url(#end-stockflow)");
+      .attr("marker-end", "url(#end-arrow)")
+      .each(function(d) { // Adjust marker refX dynamically
+          const marker = svg.select("#end-arrow");
+          // @ts-ignore
+          marker.attr("refX", getRefX(d.target));
+      });
 
 
     const nodeElements = svg.append("g")
@@ -221,7 +238,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("stroke", BG_COLOR) 
       .attr("stroke-width", "0.25em") // Slightly thicker halo
       .attr("stroke-linejoin", "round")
-      .text(d => d.label.length > 30 ? d.label.substring(0,27) + "..." : d.label); 
+      .text(d => d.label.length > 30 ? d.label.substring(0,27) + "..." : d.label)
+      .call(wrapLinkText, 150); // Wrap link labels if too long
 
     linkLabelElements.append("title")
         .text(d => `${d.type === 'incentive' ? 'Incentive' : 'Flow'}: ${d.label}${d.flow ? `\nDetails: ${d.flow}` : ''}`);
@@ -239,7 +257,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
       linkLabelElements
         .attr("x", d => (((d.source as SystemGraphNode).x || 0) + ((d.target as SystemGraphNode).x || 0)) / 2)
-        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 8); // Offset slightly above link
+        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 8)); // Offset slightly above link
     });
 
     simulation.alpha(0.8).restart();
@@ -288,13 +306,10 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
  function wrapStockText(texts: d3.Selection<SVGTextElement, SystemGraphNode, SVGGElement, unknown>, maxWidth: number) {
     texts.each(function(dNode) {
-        // This function is primarily for stock labels if they become too complex.
-        // Agent labels (circles) are simpler and might not need this multi-tspan logic,
-        // as their main label tspan already has dy adjustments.
         if (dNode.type === 'agent') {
-            const textElement = d3.select(this).select<SVGTSpanElement>("tspan:first-child"); // Select the main label tspan
+            const textElement = d3.select(this).select<SVGTSpanElement>("tspan:first-child"); 
             const agentCircleRadius = 28;
-            const maxAgentLabelWidth = agentCircleRadius * 1.7; // Approx width within circle
+            const maxAgentLabelWidth = agentCircleRadius * 1.7; 
 
             if (textElement.node() && (textElement.node() as SVGTextContentElement).getComputedTextLength() > maxAgentLabelWidth) {
                 let text = dNode.label;
@@ -307,23 +322,93 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             return;
         }
         
-        // For stocks, the tspans for label and state are already created.
-        // This function could be extended if stock labels themselves need word wrapping.
-        // For now, the multi-tspan approach for label + state is handled directly in the .each()
-        // callback when creating labelElements. If stock labels also need wrapping:
         const stockLabelTspan = d3.select(this).select<SVGTSpanElement>("tspan:first-child");
         if (stockLabelTspan.node() && (stockLabelTspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
-            // Implement word wrapping logic similar to original wrapText if needed for the main label.
-            // This would involve splitting dNode.label, creating new tspans for the label part,
-            // and adjusting dy attributes carefully considering the qualitativeState tspan.
-            // For simplicity in this iteration, I'm assuming stock names are relatively concise.
-            // If they can be long, a more robust text wrapping is needed here for the first tspan.
             let text = dNode.label;
             while (stockLabelTspan.node() && (stockLabelTspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && text.length > 0) {
                 text = text.slice(0, -1);
                 stockLabelTspan.text(text + "…");
             }
              if(stockLabelTspan.node() && text.length === 0) stockLabelTspan.text("…");
+        }
+    });
+}
+
+function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElement, unknown>, maxWidth: number) {
+    texts.each(function(dLink) {
+        const textElement = d3.select(this);
+        const words = dLink.label.split(/\s+/).reverse();
+        let word;
+        let line: string[] = [];
+        let lineNumber = 0;
+        const lineHeight = 1.1; // ems
+        const y = textElement.attr("y"); // Should already be set
+        const dy = parseFloat(textElement.attr("dy") || "0"); // Link labels don't usually have dy from start.
+        textElement.text(null); // Clear existing text before appending tspans
+
+        // Maximum 2 lines for link labels to avoid clutter
+        const maxLines = 2;
+
+        while ((word = words.pop()) && lineNumber < maxLines) {
+            line.push(word);
+            const tspan = textElement.append("tspan")
+                .attr("x", 0) // Centered by text-anchor="middle" on the group
+                .attr("dy", `${lineNumber === 0 ? dy : lineHeight}em`) // Use dy for first line, lineHeight for subsequent
+                .text(line.join(" "));
+            
+            if ((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
+                if (line.length > 1) { // If more than one word, pop the last one
+                    line.pop();
+                    tspan.text(line.join(" ")); // Reset tspan to previous line content
+                    if (lineNumber + 1 < maxLines) { // Check if we can start a new line
+                        lineNumber++;
+                        line = [word!]; // Start new line with the popped word
+                        textElement.append("tspan")
+                            .attr("x", 0)
+                            .attr("dy", `${lineHeight}em`)
+                            .text(word);
+                    } else {
+                        // Word is too long for one line and no more lines allowed, truncate previous tspan
+                        let currentText = line.join(" ");
+                        while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
+                            currentText = currentText.slice(0, -1);
+                            tspan.text(currentText + "…");
+                        }
+                        if (currentText.length === 0) tspan.text("…");
+                        words.length = 0; // Stop processing more words
+                        break;
+                    }
+                } else { // Single word is too long
+                     let currentText = line.join(" ");
+                     while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
+                        currentText = currentText.slice(0, -1);
+                        tspan.text(currentText + "…");
+                     }
+                     if (currentText.length === 0) tspan.text("…");
+                     words.length = 0; // Stop processing more words
+                     break;
+                }
+            }
+            if (words.length === 0 && lineNumber < maxLines -1 && line.join(" ").length > maxWidth) {
+                // This handles the case where the last line is too long, attempt to truncate
+                 let currentText = line.join(" ");
+                 const lastTspan = textElement.selectAll<SVGTSpanElement, unknown>("tspan").filter((_,i,nodes) => i === nodes.length -1 );
+                 while(lastTspan.node() && (lastTspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
+                    currentText = currentText.slice(0, -1);
+                    lastTspan.text(currentText + "…");
+                 }
+                 if (lastTspan.node() && currentText.length === 0) lastTspan.text("…");
+            }
+        }
+        // If text was truncated and it's the last allowed line, ensure ellipsis is on the last tspan.
+        if (words.length > 0 && lineNumber === maxLines - 1) {
+            const lastTspan = textElement.selectAll<SVGTSpanElement, unknown>("tspan").filter((_,i,nodes) => i === nodes.length -1 );
+            if (lastTspan.node()) {
+                 let currentText = lastTspan.text();
+                 if (!(currentText.endsWith("…"))) {
+                    lastTspan.text(currentText.substring(0, currentText.length -1) + "…");
+                 }
+            }
         }
     });
 }

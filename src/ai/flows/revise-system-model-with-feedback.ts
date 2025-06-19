@@ -10,7 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import {z}from 'zod';
 import { ReviseSystemModelInputSchema, ReviseSystemModelOutputSchema, SystemModelSchema } from '@/types/cascade';
 import type { ReviseSystemModelInput, ReviseSystemModelOutput } from '@/types/cascade';
 
@@ -24,25 +24,12 @@ const revisePrompt = ai.definePrompt({
   name: 'reviseSystemModelPrompt',
   input: {schema: ReviseSystemModelInputSchema},
   output: {schema: ReviseSystemModelOutputSchema},
-  prompt: `You are an expert Systems Analyst. Your task is to revise an existing system model based on user feedback.
-The user has provided feedback on what they believe is incorrect, missing, or should be changed in the current system model.
-Carefully analyze the user's feedback and the current system model. Then, produce a 'revisedSystemModel' that incorporates the feedback.
-
-When revising, you can:
-- Add new stocks, agents, or incentives.
-- Modify existing stocks, agents, or incentives (e.g., change descriptions, names if typos, incentive details).
-- Remove stocks, agents, or incentives if the feedback strongly implies they are irrelevant or incorrect.
-- Re-categorize elements if appropriate (e.g., an agent might become a stock if viewed differently).
-
-The 'revisedSystemModel' MUST strictly adhere to the SystemModel schema (stocks, agents, incentives with their sub-fields).
-Ensure that names used in 'incentives' (agentName, targetStockName) correctly refer to names defined in the 'agents' and 'stocks' lists of the *revised* model.
-
-Also, provide a 'revisionSummary' (2-3 sentences) explaining the key changes you made to the system model based on the user's feedback and your reasoning.
+  prompt: `You are an expert Systems Analyst. Your task is to revise an existing system model based on user feedback, ensuring the revised model remains coherent and interconnected.
 
 Current System Model:
 Stocks:
 {{#each currentSystemModel.stocks}}
-- Name: {{name}}{{#if description}}, Description: "{{description}}"{{/if}}
+- Name: {{name}}{{#if description}}, Description: "{{description}}"{{/if}}{{#if qualitativeState}}, State: "{{qualitativeState}}"{{/if}}
 {{else}}
 (No stocks in current model)
 {{/each}}
@@ -54,19 +41,39 @@ Agents:
 (No agents in current model)
 {{/each}}
 
-Incentives & Flows:
+Incentives & Flows (Agent-Stock):
 {{#each currentSystemModel.incentives}}
 - Agent: {{agentName}}, Target Stock: {{targetStockName}}, Incentive: "{{incentiveDescription}}"{{#if resultingFlow}}, Flow: "{{resultingFlow}}"{{/if}}
 {{else}}
-(No incentives in current model)
+(No agent-stock incentives in current model)
 {{/each}}
+
+Stock-to-Stock Flows:
+{{#if currentSystemModel.stockToStockFlows.length}}
+{{#each currentSystemModel.stockToStockFlows}}
+- Source: {{sourceStockName}}, Target: {{targetStockName}}, Flow: "{{flowDescription}}"{{#if drivingForceDescription}}, Driver: "{{drivingForceDescription}}"{{/if}}
+{{/each}}
+{{else}}
+(No stock-to-stock flows in current model)
+{{/if}}
 
 User Feedback:
 "{{userFeedback}}"
 
-Based on this feedback and the current model, generate the 'revisedSystemModel' and 'revisionSummary'.
-Focus on accurately interpreting the user's intent and making logical, coherent updates to the system model.
-If the feedback is vague or impossible to implement structurally, make a best effort to address the user's concern or explain in the summary why a direct change wasn't feasible.
+Based on this feedback and the current model:
+1.  **Preserve Existing Structure**: Start with the 'currentSystemModel'. Your primary goal is to incorporate the user's feedback while *preserving as much of the existing valid structure and connections (stocks, agents, incentives, stockToStockFlows) as possible*. Do not remove or alter existing elements unless the user's feedback *explicitly and unambiguously* directs you to do so or makes an existing element clearly redundant or incorrect in light of the feedback.
+2.  **Incorporate Feedback**:
+    *   If the user suggests adding new stocks, agents, incentives, or stock-to-stock flows, add them to the model.
+    *   If the user suggests modifying existing elements (e.g., changing descriptions, names for typos, incentive details), apply these modifications.
+    *   If the user points out missing connections, add the appropriate incentives or stock-to-stock flows.
+3.  **Ensure Interconnectedness**: Any new elements added based on feedback MUST be meaningfully connected to the existing model through appropriate incentives or stock-to-stock flows. Avoid creating isolated components in the revised model. If the feedback implies new components that cannot be logically connected to the core system dynamics influenced by the assertion, explain this limitation in your summary.
+4.  **Schema Adherence**: The 'revisedSystemModel' MUST strictly adhere to the SystemModel schema (stocks, agents, incentives, stockToStockFlows with their sub-fields).
+    *   All 'agentName' and 'targetStockName' in 'incentives' MUST refer to agents and stocks present in the *revised* 'agents' and 'stocks' lists.
+    *   All 'sourceStockName' and 'targetStockName' in 'stockToStockFlows' MUST refer to stocks present in the *revised* 'stocks' list.
+    *   Retain qualitative states on stocks if they were present.
+5.  **Revision Summary**: Provide a 'revisionSummary' (2-4 sentences) explaining the key changes you made and your reasoning, especially highlighting how feedback was incorporated and how connections were maintained or established. If a piece of feedback could not be fully implemented while maintaining model coherence, briefly explain why.
+
+Focus on accurately interpreting the user's intent and making logical, coherent updates. Prioritize a connected and holistic revised model.
 `,
 });
 
@@ -97,3 +104,4 @@ const reviseSystemModelFlow = ai.defineFlow(
     return result.output;
   }
 );
+
