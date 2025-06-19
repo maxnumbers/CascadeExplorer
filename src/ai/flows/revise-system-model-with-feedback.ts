@@ -43,7 +43,7 @@ Agents:
 
 Incentives & Flows (Agent-Stock):
 {{#each currentSystemModel.incentives}}
-- Agent: {{agentName}}, Target Stock: {{targetStockName}}, Incentive: "{{incentiveDescription}}"{{#if resultingFlow}}, Flow: "{{resultingFlow}}"{{/if}}
+- Agent: {{agentName}}, Target Stock: {{targetStockName}}, Incentive: "{{incentiveDescription}}"{{#if resultingFlow}}, Effect: "{{resultingFlow}}"{{/if}}
 {{else}}
 (No agent-stock incentives in current model)
 {{/each}}
@@ -51,7 +51,7 @@ Incentives & Flows (Agent-Stock):
 Stock-to-Stock Flows:
 {{#if currentSystemModel.stockToStockFlows.length}}
 {{#each currentSystemModel.stockToStockFlows}}
-- Source: {{sourceStockName}}, Target: {{targetStockName}}, Flow: "{{flowDescription}}"{{#if drivingForceDescription}}, Driver: "{{drivingForceDescription}}"{{/if}}
+- Source: {{sourceStockName}}, Target: {{targetStockName}}, Effect: "{{flowDescription}}"{{#if drivingForceDescription}}, Driver: "{{drivingForceDescription}}"{{/if}}
 {{/each}}
 {{else}}
 (No stock-to-stock flows in current model)
@@ -71,6 +71,8 @@ Based on this feedback and the current model:
     *   All 'agentName' and 'targetStockName' in 'incentives' MUST refer to agents and stocks present in the *revised* 'agents' and 'stocks' lists.
     *   All 'sourceStockName' and 'targetStockName' in 'stockToStockFlows' MUST refer to stocks present in the *revised* 'stocks' list.
     *   Retain qualitative states on stocks if they were present.
+    *   For 'incentives.resultingFlow', provide a very concise (ideally 2-4 words) description of the direct effect, suitable for a graph label (e.g., 'Increases Demand', 'Funds Research').
+    *   For 'stockToStockFlows.flowDescription', provide a very concise (ideally 2-4 words) description of the direct effect, suitable for a graph label (e.g., 'Boosts Morale', 'Depletes Resources').
 5.  **Revision Summary**: Provide a 'revisionSummary' (2-4 sentences) explaining the key changes you made and your reasoning, especially highlighting how feedback was incorporated and how connections were maintained or established. If a piece of feedback could not be fully implemented while maintaining model coherence, briefly explain why.
 
 Focus on accurately interpreting the user's intent and making logical, coherent updates. Prioritize a connected and holistic revised model.
@@ -105,3 +107,5 @@ const reviseSystemModelFlow = ai.defineFlow(
   }
 );
 
+
+    

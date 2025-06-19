@@ -55,11 +55,11 @@ Based on this assertion, you must:
 1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
 2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
 3.  **System Model ('systemModel')**: Analyze the assertion to identify components of an interconnected system model. This model must illustrate how the assertion's core idea would impact various elements and how these elements relate to each other.
-    *   **Stocks**: Identify the key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt', 'Employee Well-being', 'Company Productivity'). Aim for a number that comprehensively covers the core dynamics of the assertion. For each stock, provide:
+    *   **Stocks**: Identify the key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt', 'Employee Well-being', 'Company Productivity'). Identify a comprehensive set that covers the core dynamics. For each stock, provide:
         *   'name': A concise name for the stock.
         *   'description' (optional): A brief explanation of what this stock represents.
         *   **Connectivity Requirement**: Every stock MUST be demonstrably part of the system's causal web related to the assertion. It must have clear incoming influences (e.g., targeted by an agent's incentive, affected by another stock via a stock-to-stock flow) AND outgoing influences (e.g., it is the source of a stock-to-stock flow influencing another key stock, or its state is a precondition for an agent's action described in an incentive). Do not list stocks that are merely mentioned if they don't participate in the system's dynamics as triggered by the assertion.
-    *   **Agents**: Identify the key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors', 'Management', 'Employees'). Aim for a number that comprehensively covers the core dynamics of the assertion. For each agent, provide:
+    *   **Agents**: Identify the key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors', 'Management', 'Employees'). Identify a comprehensive set. For each agent, provide:
         *   'name': A concise name for the agent.
         *   'description' (optional): A brief explanation of this agent's role or nature.
             When identifying agents, consider those central to the assertion and any implied counter-agents. Ensure each agent is linked to the system through at least one incentive.
@@ -67,12 +67,12 @@ Based on this assertion, you must:
         *   'agentName': The name of an identified agent.
         *   'targetStockName': The name of an identified stock.
         *   'incentiveDescription': Agent's motivation towards the stock.
-        *   'resultingFlow': The action or flow driven by the incentive.
+        *   'resultingFlow': A very concise (ideally 2-4 words) description of the direct effect or action this incentive drives, suitable for a graph label (e.g., 'Increases Demand', 'Funds Research', 'Reduces Pollution').
     *   **Stock-to-Stock Flows ('stockToStockFlows')**: Identify a comprehensive set of significant direct influences or flows *between different stocks*. These are *crucial* for showing how changes in one stock directly impact another, forming the system's internal structure and ensuring a non-fragmented model. Examples: 'Increased Employee Well-being' (stock) leads to 'Improved Company Productivity' (stock); 'Increased Company Productivity' (stock) might enable 'Higher Investment in R&D' (stock); 'Strain on Labor Costs' (stock) might negatively impact 'Profit Margins' (stock). For each flow, provide:
         *   'sourceStockName': The source stock.
         *   'targetStockName': The target stock.
-        *   'flowDescription': How the source influences the target.
-        *   'drivingForceDescription' (optional): Underlying mechanism if not obvious.
+        *   'flowDescription': A very concise (ideally 2-4 words) description of the direct effect of the source stock on the target stock, suitable for a graph label (e.g., 'Boosts Morale', 'Depletes Resources', 'Enables Growth').
+        *   'drivingForceDescription' (optional): Brief explanation of the underlying mechanism or reason for this direct stock-to-stock interaction, if not obvious from their nature (e.g., 'Shared resource dependency', 'Natural ecological succession'). This provides more detail for tooltips.
         Ensure these flows help connect the system model cohesively, particularly linking any secondary stocks back to the primary stocks affected by the assertion.
 4.  **General Key Concepts ('keyConcepts')**: Separately, list 2-5 general key concepts mentioned in the assertion.
 5.  **Confirmation Question ('confirmationQuestion')**: Ask a concise question to confirm understanding.
@@ -105,5 +105,7 @@ const reflectAssertionFlow = ai.defineFlow(
     return result.output;
   }
 );
+
+    
 
     

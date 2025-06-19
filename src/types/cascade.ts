@@ -29,15 +29,15 @@ export const SystemIncentiveSchema = z.object({
   agentName: z.string().describe("The name of the agent possessing the incentive."),
   targetStockName: z.string().describe("The name of the stock this incentive is directed towards affecting."),
   incentiveDescription: z.string().describe("Description of the agent's motivation or goal regarding the stock."),
-  resultingFlow: z.string().optional().describe("A brief description of the flow or action this incentive typically drives from the agent, affecting the stock (e.g., 'Increases investment', 'Reduces consumption').")
+  resultingFlow: z.string().optional().describe("A very concise (ideally 2-4 words) description of the direct effect or action this incentive drives, suitable for a graph label (e.g., 'Increases Demand', 'Funds Research', 'Reduces Pollution').")
 });
 export type SystemIncentive = z.infer<typeof SystemIncentiveSchema>;
 
 export const StockToStockFlowSchema = z.object({
   sourceStockName: z.string().describe("The stock that is the source of the influence."),
   targetStockName: z.string().describe("The stock that is being influenced."),
-  flowDescription: z.string().describe("Description of how the source stock influences the target stock (e.g., 'Depletion of X leads to increase in Y', 'Growth in A enables growth in B')."),
-  drivingForceDescription: z.string().optional().describe("Brief explanation of the underlying mechanism or reason for this direct stock-to-stock interaction, if not obvious from their nature (e.g., 'Shared resource dependency', 'Natural ecological succession').")
+  flowDescription: z.string().describe("A very concise (ideally 2-4 words) description of the direct effect of the source stock on the target stock, suitable for a graph label (e.g., 'Boosts Morale', 'Depletes Resources', 'Enables Growth')."),
+  drivingForceDescription: z.string().optional().describe("Brief explanation of the underlying mechanism or reason for this direct stock-to-stock interaction, if not obvious from their nature (e.g., 'Shared resource dependency', 'Natural ecological succession'). This provides more detail for tooltips.")
 });
 export type StockToStockFlow = z.infer<typeof StockToStockFlowSchema>;
 
@@ -268,7 +268,10 @@ export interface SystemGraphNode extends SimulationNodeDatum {
 export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
   source: string; // ID of source SystemGraphNode
   target: string; // ID of target SystemGraphNode
-  label: string;  // Main descriptive label for the link (incentiveDescription or flowDescription)
-  flow?: string;   // Secondary detail (e.g., resultingFlow for incentives, or drivingForceDescription for stock-to-stock)
+  label: string;  // Primary, potentially longer descriptive label for the link (e.g., full incentiveDescription or full flowDescription)
+  displayedText: string; // The concise text to show on the graph edge, derived from AI's concise fields.
+  detailText?: string; // Optional further details for tooltip (e.g., the other part of an incentive or flow)
   type: 'incentive' | 'stock-to-stock'; // To differentiate link types
 }
+
+    
