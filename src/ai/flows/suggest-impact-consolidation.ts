@@ -3,17 +3,17 @@
 
 /**
  * @fileOverview Suggests consolidation of similar or redundant impacts from an impact map,
- * focusing on consolidating impacts only within the same order.
+ * focusing on consolidating impacts only within a single specified order/phase.
  *
- * - suggestImpactConsolidation - A function that analyzes an impact map and suggests consolidations.
- * - SuggestImpactConsolidationInput - The input type (expects all impacts grouped by order).
+ * - suggestImpactConsolidation - A function that analyzes impacts for a specific order and suggests consolidations.
+ * - SuggestImpactConsolidationInput - The input type (expects impacts for one order and the order itself).
  * - SuggestImpactConsolidationOutput - The return type for consolidation suggestions.
  */
 
 import {ai} from '@/ai/genkit';
 import {z}from 'zod'; 
-import { ImpactSchema, ImpactMappingInputForConsolidationSchema as SuggestImpactConsolidationInputSchema, StructuredConceptSchema } from '@/types/cascade';
-import type { ImpactMappingInputForConsolidation as SuggestImpactConsolidationInputType } from '@/types/cascade';
+import { ImpactSchema, SuggestImpactConsolidationInputSchema, StructuredConceptSchema } from '@/types/cascade'; // Updated to use new input schema name
+import type { SuggestImpactConsolidationInput as SuggestImpactConsolidationInputType } from '@/types/cascade';
 
 
 export type SuggestImpactConsolidationInput = SuggestImpactConsolidationInputType;
@@ -47,49 +47,41 @@ const consolidationPrompt = ai.definePrompt({
   prompt: `You are an AI assistant skilled in identifying conceptual overlaps and redundancies in a structured list of impacts.
 Your goal is to help simplify an impact map by suggesting consolidations of impacts that are truly similar or represent different expressions of the same core idea *within their specific hierarchical order*.
 
-Given the following impact map, which includes first-order, second-order, and third-order impacts stemming from an initial assertion. Each impact has an 'id', 'label', 'description', 'validity', 'order', 'keyConcepts', 'attributes', 'causalReasoning', and potentially 'parentIds' (an array of strings).
+You are given a list of impacts ('impactsForCurrentOrder') all belonging to the specified 'currentOrder' (Phase {{currentOrder}}).
 
-First-Order Impacts:
-{{#each firstOrder}}
+Impacts for Current Order (Phase {{currentOrder}}):
+{{#each impactsForCurrentOrder}}
 - ID: {{id}}, Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, ParentIDs: [{{#each parentIds}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], KeyConcepts: [{{#each keyConcepts}}{name: "{{name}}"{{#if type}}, type: "{{type}}"{{/if}}{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], CausalReasoning: "{{causalReasoning}}"
-{{/each}}
-
-Second-Order Impacts:
-{{#each secondOrder}}
-- ID: {{id}}, ParentIDs (from 1st order): [{{#each parentIds}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}{name: "{{name}}"{{#if type}}, type: "{{type}}"{{/if}}{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], CausalReasoning: "{{causalReasoning}}"
-{{/each}}
-
-Third-Order Impacts:
-{{#each thirdOrder}}
-- ID: {{id}}, ParentIDs (from 2nd order): [{{#each parentIds}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], Label: "{{label}}", Description: "{{description}}", Validity: {{validity}}, KeyConcepts: [{{#each keyConcepts}}{name: "{{name}}"{{#if type}}, type: "{{type}}"{{/if}}{{#unless @last}}, {{/unless}}{{/each}}], Attributes: [{{#each attributes}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}], CausalReasoning: "{{causalReasoning}}"
+{{else}}
+(No impacts provided for this order)
 {{/each}}
 
 Your task is to:
-1.  For EACH order (first, second, third) provided, separately analyze the impacts WITHIN that specific order.
-2.  Identify groups of **two or more impacts** *WITHIN THE SAME ORDER* that should be consolidated. A group is suitable for consolidation if the impacts are:
+1.  Analyze ONLY the impacts provided in 'impactsForCurrentOrder'.
+2.  Identify groups of **two or more impacts** *from this set* that should be consolidated. A group is suitable for consolidation if the impacts are:
     a. Highly similar or redundant in their meaning.
-    b. Represent different facets or perspectives of the *same fundamental underlying consequence or theme* appropriate to that order. These impacts might appear to stem from different parent impacts in the *preceding order* (e.g., two 2nd-order impacts having different parentIds arrays), but if they converge on a shared theme at their *current order*, they are candidates for consolidation.
-3.  Critically, do NOT suggest consolidating impacts from different orders with each other (e.g., do not merge a 1st order impact with a 2nd order impact).
-4.  For each identified group, you MUST provide:
-    a. \`originalImpactIds\`: A list of the IDs of the original impacts you suggest consolidating. All these IDs must belong to the same order. THIS FIELD IS MANDATORY AND MUST ALWAYS BE PRESENT AND CONTAIN AT LEAST TWO IDs.
-    b. \`consolidatedImpact\`: A new, single impact object. This object MUST include an \`order\` field (e.g., '1', '2', or '3') that is the SAME as the order of the \`originalImpactIds\` being consolidated.
+    b. Represent different facets or perspectives of the *same fundamental underlying consequence or theme* appropriate to this order.
+3.  For each identified group, you MUST provide:
+    a. \`originalImpactIds\`: A list of the IDs of the original impacts you suggest consolidating. All these IDs must belong to 'currentOrder'. THIS FIELD IS MANDATORY AND MUST ALWAYS BE PRESENT AND CONTAIN AT LEAST TWO IDs.
+    b. \`consolidatedImpact\`: A new, single impact object. This object MUST include an \`order\` field (e.g., '1', '2', or '3') that is the SAME as the 'currentOrder' value.
         The \`consolidatedImpact\` should also have:
-        i. \`id\`: Propose a new, unique ID (e.g., 'consolidated-1st-impact-1').
+        i. \`id\`: Propose a new, unique ID (e.g., 'consolidated-{{currentOrder}}-impact-1').
         ii. \`label\`: A concise label that captures the essence of the merged items.
         iii. \`description\`: A comprehensive description that synthesizes the original impacts' descriptions.
         iv. \`validity\`: An estimated validity ('high', 'medium', 'low') for the consolidated impact, carefully considered based on the validities of the original impacts.
         v. \`reasoning\`: A brief explanation for the consolidated impact's validity assessment.
-        vi. \`parentIds\`: An ARRAY of strings. This should be a list of the unique parent impact IDs from the *preceding order* that the new consolidated impact should link to. This list should be formed by taking the UNION of all unique parent IDs from the \`parentIds\` arrays of the original impacts being consolidated. If consolidating 1st order impacts (which link to the core assertion and may have empty or no parentIds initially), then \`parentIds\` for the consolidated impact should be an empty array or omitted.
+        vi. \`parentIds\`: An ARRAY of strings. This should be a list of the unique parent impact IDs from the *preceding order* that the new consolidated impact should link to. This list should be formed by taking the UNION of all unique parent IDs from the \`parentIds\` arrays of the original impacts being consolidated. If consolidating 1st order impacts (currentOrder is '1'), then \`parentIds\` for the consolidated impact should be an empty array or omitted.
         vii. \`keyConcepts\`: Synthesize a new list of structured key concepts (2-4, each as an object with 'name' and optional 'type') for the consolidated impact, drawing from the original impacts' key concepts.
         viii. \`attributes\`: Synthesize a new list of attributes (1-2) for the consolidated impact, drawing from the original impacts' attributes.
         ix. \`causalReasoning\`: If consolidating impacts that had causal reasoning, synthesize a new causal reasoning for the consolidated impact, or explain why it's no longer needed. If not applicable, omit.
     c. \`confidence\`: Your confidence ('high', 'medium', 'low') that this consolidation is appropriate and meaningful.
     d. \`reasoningForConsolidation\`: A brief explanation of why these specific impacts (from the same order) can be consolidated, highlighting the shared theme or redundancy.
-5.  If no such groups are found within any order, return an empty list for \`consolidationSuggestions\`.
+4.  If no such groups are found, return an empty list for \`consolidationSuggestions\`.
 
-Focus on strong semantic similarity and thematic convergence within each order. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order. The synthesized structured keyConcepts (name, type) and attributes for the consolidated impact are crucial.
+Focus on strong semantic similarity and thematic convergence. Ensure the consolidated impact truly represents a sensible merge of the originals and maintains its original order ('currentOrder'). The synthesized structured keyConcepts (name, type) and attributes for the consolidated impact are crucial.
 MAKE ABSOLUTELY SURE THAT EACH SUGGESTION OBJECT IN THE 'consolidationSuggestions' ARRAY CONTAINS THE 'originalImpactIds' FIELD, AND THAT THIS FIELD CONTAINS AT LEAST TWO STRING IDENTIFIERS.
 The 'consolidatedImpact.parentIds' field MUST be an array of strings.
+The 'consolidatedImpact.order' field MUST match the 'currentOrder' input.
 `,
 });
 
@@ -99,28 +91,15 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
     inputSchema: SuggestImpactConsolidationInputSchema,
     outputSchema: SuggestImpactConsolidationOutputSchema,
   },
-  async (input) => {
-    if (!input.firstOrder && !input.secondOrder && !input.thirdOrder) {
+  async (input: SuggestImpactConsolidationInput) => {
+    if (!input.impactsForCurrentOrder || input.impactsForCurrentOrder.length < 2) {
          return { consolidationSuggestions: [] };
     }
-    // Ensure arrays are present even if empty for the prompt to avoid Handlebars errors
+    
     const promptInput = {
-        firstOrder: (input.firstOrder || []).map(impact => ({...impact, parentIds: impact.parentIds || []})),
-        secondOrder: (input.secondOrder || []).map(impact => ({...impact, parentIds: impact.parentIds || []})),
-        thirdOrder: (input.thirdOrder || []).map(impact => ({...impact, parentIds: impact.parentIds || []})),
+        impactsForCurrentOrder: (input.impactsForCurrentOrder || []).map(impact => ({...impact, parentIds: impact.parentIds || []})),
+        currentOrder: input.currentOrder,
     };
-
-    if (promptInput.firstOrder.length === 0 && promptInput.secondOrder.length === 0 && promptInput.thirdOrder.length === 0) {
-      return { consolidationSuggestions: [] };
-    }
-
-    const canConsolidateFirst = promptInput.firstOrder.length >= 2;
-    const canConsolidateSecond = promptInput.secondOrder.length >= 2;
-    const canConsolidateThird = promptInput.thirdOrder.length >= 2;
-
-    if (!canConsolidateFirst && !canConsolidateSecond && !canConsolidateThird) {
-        return { consolidationSuggestions: [] };
-    }
 
     const result = await consolidationPrompt(promptInput);
     if (!result || !result.output) {
@@ -128,12 +107,13 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
       throw new Error('AI failed to provide valid consolidation suggestions output.');
     }
     
-    // Ensure parentIds is an array in the output
     const validatedSuggestions = (result.output.consolidationSuggestions || []).map(suggestion => ({
         ...suggestion,
         consolidatedImpact: {
             ...suggestion.consolidatedImpact,
             parentIds: suggestion.consolidatedImpact.parentIds || [],
+            // Ensure the order from AI matches the currentOrder it was asked to process
+            order: input.currentOrder, 
         }
     }));
 
@@ -141,3 +121,4 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
   }
 );
 
+```

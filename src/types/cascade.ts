@@ -64,13 +64,13 @@ export const ImpactSchema = z.object({
 });
 export type Impact = z.infer<typeof ImpactSchema>;
 
-// Schema for the input to the consolidation flow (all impacts grouped by order/phase)
-export const ImpactMappingInputForConsolidationSchema = z.object({
-  firstOrder: z.array(ImpactSchema).describe('Impacts from the first phase.'),
-  secondOrder: z.array(ImpactSchema).describe('Impacts from the transition phase.'),
-  thirdOrder: z.array(ImpactSchema).describe('Impacts from the stabilization phase.'),
+// Schema for the input to the consolidation flow
+// Renamed from ImpactMappingInputForConsolidationSchema
+export const SuggestImpactConsolidationInputSchema = z.object({
+  impactsForCurrentOrder: z.array(ImpactSchema).describe('Impacts from the current order/phase to consider for consolidation.'),
+  currentOrder: z.enum(['1', '2', '3']).describe("The order/phase these impacts belong to ('1' for Initial, '2' for Transition, '3' for Stabilization)."),
 });
-export type ImpactMappingInputForConsolidation = z.infer<typeof ImpactMappingInputForConsolidationSchema>;
+export type SuggestImpactConsolidationInput = z.infer<typeof SuggestImpactConsolidationInputSchema>;
 
 
 // Schema for the input of the cascade summary generation AI flow
@@ -205,7 +205,6 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
     [key: string]: any;
   };
   originalColor?: string;
-  // parentId is now replaced by parentIds in Impact, so it's inherited
 }
 
 export interface ImpactLink extends SimulationLinkDatum<ImpactNode> {
@@ -273,3 +272,5 @@ export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
   flow?: string;   // resultingFlow (for agent-stock) or drivingForce (for stock-stock)
   type: 'incentive' | 'stock-to-stock';
 }
+
+```

@@ -38,7 +38,7 @@ export function ConsolidationSuggestionsDisplay({
       return node ? `"${node.label}"` : `ID: ${id}`;
     }).slice(0, 2); 
 
-    let labelText = `Consolidate: ${originalLabels.join(' & ')}`;
+    let labelText = `Consolidate Phase ${suggestion.consolidatedImpact.order}: ${originalLabels.join(' & ')}`;
     if (suggestion.originalImpactIds.length > 2) {
       labelText += ` & ${suggestion.originalImpactIds.length - 2} more`;
     }
@@ -74,12 +74,12 @@ export function ConsolidationSuggestionsDisplay({
           Impact Consolidation Suggestions
         </CardTitle>
         <CardDescription className="text-muted-foreground">
-          The AI has identified potential overlaps. Review the suggestions below to streamline your impact map.
+          The AI has identified potential overlaps for the current phase. Review the suggestions below to streamline your impact map.
         </CardDescription>
       </CardHeader>
       <CardContent>
         {suggestions.consolidationSuggestions.length === 0 ? (
-          <p className="text-muted-foreground">No consolidation opportunities found by the AI.</p>
+          <p className="text-muted-foreground">No consolidation opportunities found by the AI for the current phase.</p>
         ) : (
           <Accordion type="single" collapsible className="w-full">
             {suggestions.consolidationSuggestions.map((suggestion, index) => {
@@ -100,14 +100,14 @@ export function ConsolidationSuggestionsDisplay({
                        <span className="font-semibold text-primary">{getTriggerLabel(suggestion)}</span>
                        <div className="text-xs text-muted-foreground mt-1 flex items-center">
                           <span>Confidence: <Badge variant={getConfidenceVariant(suggestion.confidence)} className="ml-1">{suggestion.confidence}</Badge></span>
-                          <span className="ml-3">Order: <Badge style={{ backgroundColor: orderColor, color: 'hsl(var(--primary-foreground))'}} className="ml-1">{suggestion.consolidatedImpact.order}</Badge></span>
+                          <span className="ml-3">Target Phase: <Badge style={{ backgroundColor: orderColor, color: 'hsl(var(--primary-foreground))'}} className="ml-1">{suggestion.consolidatedImpact.order}</Badge></span>
                        </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="space-y-6 p-4 bg-background/30 rounded-md border border-input mt-1">
                     
                     <div>
-                      <h4 className="font-semibold text-accent mb-2">Original Impacts to Consolidate:</h4>
+                      <h4 className="font-semibold text-accent mb-2">Original Impacts to Consolidate (Phase {suggestion.consolidatedImpact.order}):</h4>
                       <ul className="space-y-3">
                         {suggestion.originalImpactIds.map(id => {
                           const originalNode = graphNodes.find(n => n.id === id);
@@ -143,7 +143,7 @@ export function ConsolidationSuggestionsDisplay({
                     <div className="border-t border-border my-4"></div>
 
                     <div className="space-y-1">
-                      <h4 className="font-semibold text-accent mb-2">Proposed Consolidated Impact:</h4>
+                      <h4 className="font-semibold text-accent mb-2">Proposed Consolidated Impact (Phase {suggestion.consolidatedImpact.order}):</h4>
                       <div className="p-3 border border-input rounded-md bg-card/50 shadow-sm space-y-1">
                           <div>
                               <strong className="text-sm text-primary">New Label:</strong> <span className="text-foreground">{suggestion.consolidatedImpact.label}</span>
@@ -200,9 +200,11 @@ export function ConsolidationSuggestionsDisplay({
       </CardContent>
       {suggestions.consolidationSuggestions.length > 0 && (
         <CardFooter>
-            <p className="text-xs text-muted-foreground">Review each suggestion carefully. Applying consolidations will merge impacts in the graph.</p>
+            <p className="text-xs text-muted-foreground">Review each suggestion carefully. Applying consolidations will merge impacts in the graph for the current phase.</p>
         </CardFooter>
       )}
     </Card>
   );
 }
+
+```
