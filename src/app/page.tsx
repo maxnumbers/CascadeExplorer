@@ -34,7 +34,7 @@ const goalOptions: GoalOption[] = [
     title: "Test a Decision",
     description: "See potential outcomes before committing to a choice.",
     promptLabel: "What decision are you considering?",
-    placeholder: "Our company, currently reliant on fossil fuels for energy, is considering a major strategic shift to invest heavily in adopting renewable energy sources (solar, wind) for all operations within the next 10 years. This involves significant capital expenditure, which will affect our Capital Reserves, and requires retraining our workforce, which impacts Employee Skills. We may also need to divest from some existing assets. Key groups involved include our Investors, who are interested in ROI; our Employees, concerned about Job Security; Local Communities, whose wellbeing could be affected; and Environmental NGOs, who advocate for Emission Reduction. The primary aim is to improve our long-term Sustainability Score and reduce Carbon Emissions, but we're also mindful of short-term Profit Margins and maintaining Operational Efficiency.",
+    placeholder: "Our company is considering a major shift to invest heavily in renewable energy for all operations within the next 10 years. This involves significant capital expenditure and requires retraining our workforce. Key groups involved include our investors, employees, local communities, and environmental NGOs. The primary aim is to improve long-term sustainability and reduce carbon emissions, while being mindful of short-term profit margins and operational efficiency.",
     icon: HelpCircle,
   },
   {
@@ -42,7 +42,7 @@ const goalOptions: GoalOption[] = [
     title: "Strengthen a Pitch",
     description: "Build an airtight argument for your idea or proposal.",
     promptLabel: "What idea or proposal are you trying to convince someone of?",
-    placeholder: "To revitalize our city's downtown core, which currently suffers from low Foot Traffic and many Vacant Storefronts, we should implement a 'Pedestrian-First' initiative. This involves converting Main Street into a car-free zone on weekends, investing in public art installations to enhance the area's Public Art Value, and offering tax incentives from the City Treasury to encourage Small Businesses to open. The main players are the City Council, who care about Public Approval; local business owners (both existing and potential); city Residents, whose Satisfaction we want to improve; and an external urban planning consultancy. The goal is to boost Local Economic Activity, improve Community Wellbeing, and enhance Cultural Vibrancy, while considering potential impacts on Traffic Congestion and current business models.",
+    placeholder: "To revitalize our city's downtown core, we should implement a 'Pedestrian-First' initiative. This involves converting Main Street into a car-free zone on weekends, investing in public art installations, and offering tax incentives to encourage small businesses. The main players are the City Council, local business owners, city residents, and an urban planning consultancy. The goal is to boost local economic activity, improve community wellbeing, and enhance cultural vibrancy, while considering impacts on traffic and current business models.",
     icon: Brain,
   },
   {
@@ -50,7 +50,7 @@ const goalOptions: GoalOption[] = [
     title: "Find Blind Spots",
     description: "Uncover hidden risks and unintended consequences of a plan.",
     promptLabel: "What plan, change, or existing situation are you analyzing for risks?",
-    placeholder: "Our established Tech Company plans to launch a new AI-powered social media platform. It uses advanced algorithms to personalize content feeds and facilitate user connections. While the goal is rapid growth in our User Base and Market Share, we need to analyze risks related to User Data Security and how this affects Users' sense of Privacy. We must also consider Algorithmic Fairness and its impact on Public Trust, the potential for Misinformation Spread which affects Information Integrity (possibly driven by Malicious Actors), and the Mental Well-being of our users. Other involved parties include Advertisers, who want Ad Reach; Regulatory Bodies, focused on Compliance; and Competitor Platforms. We also need to consider the strain on our Engineering Capacity and Server Infrastructure.",
+    placeholder: "Our tech company plans to launch a new AI-powered social media platform. While the goal is rapid user growth, we need to analyze risks related to user data security, algorithmic fairness, the potential for misinformation spread, and the mental well-being of users. Other involved parties include advertisers, regulatory bodies, and competitor platforms. We also need to consider strain on our engineering capacity and server infrastructure.",
     icon: Search,
   },
   {
@@ -58,7 +58,7 @@ const goalOptions: GoalOption[] = [
     title: "Explore an Assertion",
     description: "Conduct a general exploration of an idea's cascading impacts.",
     promptLabel: "Enter your assertion or idea:",
-    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform Urban Density, affect labor markets for Transportation Workers and the overall Employment Rate in Transport, and change the concept of Mobility Access. This will impact how City Planners work, influence Infrastructure Quality through investment needs, affect Road Safety, and potentially create New Business Creation opportunities while displacing existing industries. Consider the interplay between AV Developers, driven by Innovation Speed; Regulatory Bodies, concerned with Safety Standards; and the level of Public Trust in AVs.",
+    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform urban density, affect labor markets for transportation workers, and change the concept of mobility access. This will impact city planners, influence infrastructure investment, affect road safety, and potentially create new business opportunities while displacing existing industries. Consider the interplay between AV developers, regulatory bodies, and public trust.",
     icon: Target,
   }
 ];
@@ -823,7 +823,7 @@ export default function CascadeExplorerPage() {
           
           <div className="mt-6 pt-4 border-t border-border">
             <h3 className="text-md font-semibold mb-3 text-accent">Or try an example:</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {goalOptions.map((goal) => (
                 <Button 
                   key={goal.id} 
@@ -842,7 +842,7 @@ export default function CascadeExplorerPage() {
                   </div>
                 </Button>
               ))}
-            </div>
+            </div> */}
           </div>
           
           </CardContent></Card>
