@@ -6,9 +6,9 @@ import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import type { SimulationNodeDatum, SimulationLinkDatum } from 'd3'; // d3 types still needed for simulation
 
-const STOCK_COLOR = 'hsl(var(--primary))'; // Electric Blue for stocks
-const AGENT_COLOR = 'hsl(var(--accent))';  // Soft Purple for agents
-const LINK_COLOR = 'hsl(var(--muted-foreground))'; 
+const STOCK_COLOR = 'hsl(var(--primary))';
+const AGENT_COLOR = 'hsl(var(--accent))';
+const LINK_COLOR = 'hsl(var(--muted-foreground))';
 const LINK_LABEL_COLOR = 'hsl(var(--foreground))';
 const BG_COLOR = 'hsl(var(--card))';
 
@@ -59,8 +59,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         links.push({
           source: agentNode.id,
           target: stockNode.id,
-          label: incentive.incentiveDescription, // Full description for tooltip
-          displayedText: incentive.resultingFlow || incentive.incentiveDescription.substring(0,20) + "...", // Concise text for display
+          label: incentive.incentiveDescription, 
+          displayedText: incentive.resultingFlow || incentive.incentiveDescription.substring(0,20) + (incentive.incentiveDescription.length > 20 ? "..." : ""), 
           detailText: incentive.resultingFlow && incentive.resultingFlow !== incentive.incentiveDescription ? incentive.resultingFlow : undefined,
           type: 'incentive',
         });
@@ -79,8 +79,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             links.push({
                 source: sourceNode.id,
                 target: targetNode.id,
-                label: flow.flowDescription, // This is prompted to be short
-                displayedText: flow.flowDescription, // Use directly
+                label: flow.flowDescription, 
+                displayedText: flow.flowDescription, 
                 detailText: flow.drivingForceDescription,
                 type: 'stock-to-stock',
             });
@@ -154,14 +154,13 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("stroke", LINK_COLOR)
       .attr("stroke-opacity", 0.7)
       .selectAll("line")
-      .data(d3Links, (d: any) => `${d.source.id || d.source}-${d.target.id || d.target}`)
+      .data(d3Links, (d: any) => `${typeof d.source === 'object' ? d.source.id : d.source}-${typeof d.target === 'object' ? d.target.id : d.target}`)
       .join("line")
       .attr("stroke-width", 1.5)
       .attr("marker-end", "url(#end-arrow)")
       .each(function(d) { 
           const marker = svg.select("#end-arrow"); 
-          // @ts-ignore
-          marker.attr("refX", getRefXForMarker(d.target));
+          marker.attr("refX", getRefXForMarker(d.target as SystemGraphNode));
       });
 
 
@@ -230,7 +229,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     const linkLabelElements = linkLabelGroup
       .selectAll("text")
-      .data(d3Links) // Use the same d3Links data that forceLink uses
+      .data(d3Links) 
       .join("text")
       .attr("class", "link-label")
       .attr("font-size", "9px")
@@ -264,14 +263,14 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             
       linkLabelElements
         .attr("x", (d: SystemGraphLink) => {
-            const sourceNode = d.source as SimulationNodeDatum; // d.source is a node object
-            const targetNode = d.target as SimulationNodeDatum; // d.target is a node object
+            const sourceNode = d.source as SystemGraphNode; 
+            const targetNode = d.target as SystemGraphNode; 
             return ((sourceNode.x || 0) + (targetNode.x || 0)) / 2;
         })
         .attr("y", (d: SystemGraphLink) => {
-            const sourceNode = d.source as SimulationNodeDatum;
-            const targetNode = d.target as SimulationNodeDatum;
-            return ((sourceNode.y || 0) + (targetNode.y || 0)) / 2 - 8; // Offset slightly above link
+            const sourceNode = d.source as SystemGraphNode;
+            const targetNode = d.target as SystemGraphNode;
+            return ((sourceNode.y || 0) + (targetNode.y || 0)) / 2 - 8; 
         });
     });
                 
@@ -291,7 +290,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       simulation.stop();
     };
 
-  }, [systemModel, propWidth, propHeight]); // Rerun effect if systemModel or dimensions change. Dimensions are now from container.
+  }, [systemModel, propWidth, propHeight]); 
 
 
   function drag(simulation: d3.Simulation<SystemGraphNode, undefined>) {
@@ -349,13 +348,13 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElement, unknown>, maxWidth: number) {
     texts.each(function(dLink) {
         const textElement = d3.select(this);
-        const words = (dLink.displayedText || "").split(/\s+/).reverse(); // Use displayedText here
+        const words = (dLink.displayedText || "").split(/\s+/).reverse(); 
         let word;
         let line: string[] = [];
         let lineNumber = 0;
-        const lineHeight = 1.1; // ems
-        // const y = textElement.attr("y");  // Not needed as tspans are relative
-        const dy = parseFloat(textElement.attr("dy") || "0"); 
+        const lineHeight = 1.1; 
+        const dyAttribute = textElement.attr("dy");
+        const dy = dyAttribute ? parseFloat(dyAttribute) : 0; 
         textElement.text(null); 
 
         const maxLines = 2;
@@ -415,9 +414,10 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
 
   return (
     <div ref={containerRef} className="w-full h-full flex justify-center items-center bg-card rounded-lg shadow-inner overflow-hidden border border-input">
-       <svg ref={svgRef}></svg> {/* Removed fixed width/height, will scale to container */}
+       <svg ref={svgRef}></svg>
     </div>
   );
 };
 
 export default SystemModelGraph;
+
