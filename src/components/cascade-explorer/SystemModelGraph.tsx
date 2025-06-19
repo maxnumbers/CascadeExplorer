@@ -57,8 +57,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
       if (agentNode && stockNode) {
         links.push({
-          source: agentNode.id,
-          target: stockNode.id,
+          source: agentNode.id, // String ID
+          target: stockNode.id, // String ID
           label: incentive.incentiveDescription, 
           displayedText: incentive.resultingFlow || incentive.incentiveDescription.substring(0,20) + (incentive.incentiveDescription.length > 20 ? "..." : ""), 
           detailText: incentive.resultingFlow && incentive.resultingFlow !== incentive.incentiveDescription ? incentive.resultingFlow : undefined,
@@ -77,8 +77,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
         if (sourceNode && targetNode) {
             links.push({
-                source: sourceNode.id,
-                target: targetNode.id,
+                source: sourceNode.id, // String ID
+                target: targetNode.id, // String ID
                 label: flow.flowDescription, 
                 displayedText: flow.flowDescription, 
                 detailText: flow.drivingForceDescription,
@@ -262,15 +262,15 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
             
       linkLabelElements
-        .attr("x", (d: SystemGraphLink) => {
-            const sourceNode = d.source as SystemGraphNode; 
-            const targetNode = d.target as SystemGraphNode; 
-            return ((sourceNode.x || 0) + (targetNode.x || 0)) / 2;
+        .attr("x", (linkData: SystemGraphLink) => {
+            const sourceNode = linkData.source as SystemGraphNode;
+            // Diagnostic: Position directly at source node x
+            return sourceNode.x || 0; 
         })
-        .attr("y", (d: SystemGraphLink) => {
-            const sourceNode = d.source as SystemGraphNode;
-            const targetNode = d.target as SystemGraphNode;
-            return ((sourceNode.y || 0) + (targetNode.y || 0)) / 2 - 8; 
+        .attr("y", (linkData: SystemGraphLink) => {
+            const sourceNode = linkData.source as SystemGraphNode;
+            // Diagnostic: Position directly at source node y
+            return sourceNode.y || 0;
         });
     });
                 
@@ -353,8 +353,9 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
         let line: string[] = [];
         let lineNumber = 0;
         const lineHeight = 1.1; 
-        const dyAttribute = textElement.attr("dy");
-        const dy = dyAttribute ? parseFloat(dyAttribute) : 0; 
+        // Use a default dy if textElement.attr("dy") is null, or ensure it's a number.
+        const initialDyAttr = textElement.attr("dy");
+        const dy = initialDyAttr ? parseFloat(initialDyAttr) : 0;
         textElement.text(null); 
 
         const maxLines = 2;
