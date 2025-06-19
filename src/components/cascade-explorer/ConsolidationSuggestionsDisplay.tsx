@@ -206,5 +206,3 @@ export function ConsolidationSuggestionsDisplay({
     </Card>
   );
 }
-
-```

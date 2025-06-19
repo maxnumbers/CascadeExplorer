@@ -272,5 +272,3 @@ export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
   flow?: string;   // resultingFlow (for agent-stock) or drivingForce (for stock-stock)
   type: 'incentive' | 'stock-to-stock';
 }
-
-```

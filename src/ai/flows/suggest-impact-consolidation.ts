@@ -120,5 +120,3 @@ const suggestImpactConsolidationFlow = ai.defineFlow(
     return { consolidationSuggestions: validatedSuggestions };
   }
 );
-
-```

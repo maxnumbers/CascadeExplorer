@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info, Settings2 } from 'lucide-react';
+import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info, Settings2, LinkIcon, Package, Users, TrendingUp, ArrowRightLeft, ThumbsUp, ThumbsDown, MinusCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -220,7 +220,7 @@ export default function CascadeExplorerPage() {
         description: node.description,
         validity: node.validity,
         reasoning: node.reasoning,
-        parentIds: node.parentIds || [], // Ensure parentIds is an array
+        parentIds: node.parentIds || [], 
         keyConcepts: keyConcepts,
         attributes: attributes,
         causalReasoning: node.causalReasoning,
@@ -294,7 +294,6 @@ export default function CascadeExplorerPage() {
         });
         setCurrentSystemQualitativeStates(initialStates);
         
-        // Pass the just-updated reflection and states to handleIdentifyTensions
         await handleIdentifyTensions(updatedReflectionWithStates, currentAssertionText);
 
     } catch (error: any) {
@@ -344,7 +343,7 @@ export default function CascadeExplorerPage() {
     }
 
     setUiStep(currentLoadingStep);
-    setConsolidationSuggestions(null); // Clear previous phase's suggestions
+    setConsolidationSuggestions(null); 
     setPreviousSystemQualitativeStates(currentSystemQualitativeStates); 
 
     try {
@@ -471,7 +470,7 @@ export default function CascadeExplorerPage() {
       toast({ title: "Missing Context", description: "Cannot generate impacts without confirmed assertion, system model with qualitative states, and tension analysis.", variant: "destructive" });
       return;
     }
-    // Capture the initial state as "previous" before 1st order impacts change it
+    
     setPreviousSystemQualitativeStates(currentSystemQualitativeStates); 
 
     const coreNode: ImpactNode = {
@@ -611,19 +610,16 @@ export default function CascadeExplorerPage() {
       };
       const result = await suggestImpactConsolidation(consolidationInput);
       
-      const currentNodesSnapshotForValidation = allImpactNodesRef.current; // For validation against existing nodes
+      const currentNodesSnapshotForValidation = allImpactNodesRef.current; 
       const validSuggestions = (result.consolidationSuggestions || []).filter(suggestion => {
         if (!suggestion.originalImpactIds || suggestion.originalImpactIds.length < 2) return false;
         const originalNodes = suggestion.originalImpactIds.map(id => currentNodesSnapshotForValidation.find(n => n.id === id)).filter(Boolean) as ImpactNode[];
         if (originalNodes.length !== suggestion.originalImpactIds.length || originalNodes.length === 0) return false;
         
-        const firstOriginalOrder = originalNodes[0].order; // This is a number
-        const suggestionConsolidatedOrderString = String(suggestion.consolidatedImpact.order); // Comes as string from AI schema
+        const firstOriginalOrder = originalNodes[0].order; 
+        const suggestionConsolidatedOrderString = String(suggestion.consolidatedImpact.order); 
         
-        // Validate all original nodes are of the same order AND match the order the AI was asked to consolidate for
         if (!originalNodes.every(node => node.order === firstOriginalOrder && String(node.order) === currentReviewOrder)) return false;
-        
-        // Validate the consolidated impact's order also matches
         if (!['0', '1', '2', '3'].includes(suggestionConsolidatedOrderString) || suggestionConsolidatedOrderString !== currentReviewOrder) return false;
         
         return true;
@@ -666,7 +662,7 @@ export default function CascadeExplorerPage() {
         return;
     }
     const consolidatedOrderString = String(suggestedConsolidatedImpact.order);
-    if (!['1', '2', '3'].includes(consolidatedOrderString)) { // Core assertion (0) should not be consolidated this way
+    if (!['1', '2', '3'].includes(consolidatedOrderString)) { 
         toast({title: "Invalid Order for Consolidation", description: `Consolidated impact has an invalid order: ${consolidatedOrderString}.`, variant:"destructive"});
         return;
     }
@@ -699,13 +695,11 @@ export default function CascadeExplorerPage() {
         const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
 
         if (originalImpactIds.includes(sourceId) || originalImpactIds.includes(targetId)) {
-           // Links involving original nodes are candidates for removal or re-parenting
         } else {
-            finalNewLinks.push(link); // Keep links not involving original nodes
+            finalNewLinks.push(link); 
         }
     });
 
-    // Add links FOR the new consolidated node (from its parents)
     if (newGraphNode.parentIds) {
         newGraphNode.parentIds.forEach(pid => {
             const parentNode = nextNodes.find(n => n.id === pid && n.order === newGraphNode.order - 1);
@@ -721,14 +715,13 @@ export default function CascadeExplorerPage() {
         finalNewLinks.push({ source: CORE_ASSERTION_ID, target: newGraphNode.id });
     }
 
-    // Re-parent children of the original nodes to the new consolidated node
     const childrenToReParent: { childId: string, originalParentId: string }[] = [];
     currentLinks.forEach(link => {
         const sourceId = typeof link.source === 'object' ? (link.source as ImpactNode).id : String(link.source);
         const targetId = typeof link.target === 'object' ? (link.target as ImpactNode).id : String(link.target);
         if (originalImpactIds.includes(sourceId) && !originalImpactIds.includes(targetId)) {
-            const childNode = currentNodes.find(n => n.id === targetId); // Check from original list of nodes
-            if (childNode && childNode.order === newGraphNode.order + 1) { // Ensure child is in next order
+            const childNode = currentNodes.find(n => n.id === targetId); 
+            if (childNode && childNode.order === newGraphNode.order + 1) { 
                 childrenToReParent.push({childId: targetId, originalParentId: sourceId });
             }
         }
@@ -827,9 +820,13 @@ export default function CascadeExplorerPage() {
         return ( 
           <Card className="shadow-xl bg-card"><CardHeader><CardTitle className="text-2xl text-primary">Step 1: Define Your Assertion</CardTitle><CardDescription>Enter your assertion, idea, or decision to explore, or select an example.</CardDescription></CardHeader><CardContent>
           <AssertionInputForm onSubmit={handleAssertionSubmit} isLoading={isLoading} initialAssertionText={currentAssertionText} onAssertionChange={setCurrentAssertionText} inputPromptLabel="Your Assertion / Idea / Decision:" placeholder="e.g., Implementing a universal basic income..."/>
+          
+          {/* Temporarily commented out for diagnosis 
           <div className="mt-6 pt-4 border-t border-border"><h3 className="text-md font-semibold mb-3 text-accent">Or try an example:</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {goalOptions.map((goal) => (<Button key={goal.id} variant="outline" className="text-left h-auto py-2 px-3 justify-start hover:bg-accent/10" onClick={() => handleExampleButtonClick(goal.placeholder, goal.id)}> <goal.icon className="w-4 h-4 mr-2 shrink-0 text-primary" /> <div> <span className="block text-sm text-foreground">{goal.placeholder}</span> <span className="block text-xs text-muted-foreground italic">({goal.title})</span></div></Button>))}
-          </div></div></CardContent></Card>
+          </div></div>
+          */}
+          </CardContent></Card>
         );
       case ExplorerStep.REFLECTION_PENDING: return commonLoading("Reflecting on your input...");
       case ExplorerStep.REVISING_SYSTEM_MODEL: return commonLoading("AI is revising the system model...");
@@ -1052,5 +1049,3 @@ export default function CascadeExplorerPage() {
     </div>
   );
 }
-
-```
