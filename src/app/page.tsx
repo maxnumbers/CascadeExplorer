@@ -34,7 +34,7 @@ const goalOptions: GoalOption[] = [
     title: "Test a Decision",
     description: "See potential outcomes before committing to a choice.",
     promptLabel: "What decision are you considering?",
-    placeholder: "Our company, currently reliant on fossil fuels for energy, is considering a major strategic shift to invest heavily in adopting renewable energy sources (solar, wind) for all operations within the next 10 years. This involves significant capital expenditure, retraining workforce, and potentially divesting from some existing assets. Key stakeholders include investors, employees, local communities, and environmental groups. The primary goal is long-term sustainability and reduced carbon footprint, but short-term profitability and operational stability are concerns.",
+    placeholder: "Our company, currently reliant on fossil fuels for energy, is considering a major strategic shift to invest heavily in adopting renewable energy sources (solar, wind) for all operations within the next 10 years. This involves significant capital expenditure (stock: Capital Reserves), retraining workforce (agent: Employees, stock: Workforce Skills), and potentially divesting from some existing assets. Key stakeholders include investors (agent: Investors, incentive: ROI), employees (incentive: Job Security), local communities (agent: Community, stock: Community Wellbeing), and environmental groups (agent: Environmental NGOs, incentive: Emission Reduction). The primary goal is long-term sustainability (stock: Sustainability Score) and reduced carbon footprint (stock: Carbon Emissions), but short-term profitability (stock: Profit Margins) and operational stability (stock: Operational Efficiency) are concerns.",
     icon: HelpCircle,
   },
   {
@@ -42,7 +42,7 @@ const goalOptions: GoalOption[] = [
     title: "Strengthen a Pitch",
     description: "Build an airtight argument for your idea or proposal.",
     promptLabel: "What idea or proposal are you trying to convince someone of?",
-    placeholder: "To revitalize our city's downtown core, which currently suffers from low foot traffic and vacant storefronts, we should implement a 'Pedestrian-First' initiative. This involves converting Main Street into a car-free zone on weekends, investing in public art installations, and offering tax incentives for small, local businesses (cafes, boutiques, galleries) to open. Key actors are the City Council, local business owners (existing and potential), residents, and an external urban planning consultancy. The aim is to boost the local economy, improve community well-being, and enhance cultural vibrancy, while considering potential impacts on traffic flow and existing business models.",
+    placeholder: "To revitalize our city's downtown core, which currently suffers from low foot traffic (stock: Foot Traffic) and vacant storefronts (stock: Storefront Occupancy), we should implement a 'Pedestrian-First' initiative. This involves converting Main Street into a car-free zone on weekends, investing in public art installations (stock: Public Art Value), and offering tax incentives (flow: from City Treasury to Businesses) for small, local businesses (agent: Small Businesses, incentive: Profitability) to open. Key actors are the City Council (agent: City Council, incentive: Public Approval), local business owners (existing and potential), residents (agent: Residents, stock: Resident Satisfaction), and an external urban planning consultancy (agent: Urban Planners). The aim is to boost the local economy (stock: Local Economic Activity), improve community well-being (stock: Community Wellbeing), and enhance cultural vibrancy (stock: Cultural Vibrancy), while considering potential impacts on traffic flow (stock: Traffic Congestion) and existing business models.",
     icon: Brain,
   },
   {
@@ -50,7 +50,7 @@ const goalOptions: GoalOption[] = [
     title: "Find Blind Spots",
     description: "Uncover hidden risks and unintended consequences of a plan.",
     promptLabel: "What plan, change, or existing situation are you analyzing for risks?",
-    placeholder: "Our established tech company plans to launch a new AI-powered social media platform that uses advanced algorithms to personalize content feeds and facilitate user connections. While the goal is rapid user growth and market share, we need to analyze risks related to data privacy (user data as a stock), algorithmic bias (public trust as a stock), potential for misinformation spread (platform integrity as a stock), and the mental well-being of users (user well-being as a stock). Key agents include users, advertisers, regulatory bodies, and competitor platforms. We also need to consider the impact on our engineering resources and server infrastructure.",
+    placeholder: "Our established tech company (agent: Tech Company) plans to launch a new AI-powered social media platform that uses advanced algorithms to personalize content feeds and facilitate user connections. While the goal is rapid user growth (stock: User Base) and market share (stock: Market Share), we need to analyze risks related to data privacy (stock: User Data Security, agent: Users, incentive: Privacy), algorithmic bias (stock: Algorithmic Fairness, impact on stock: Public Trust), potential for misinformation spread (stock: Information Integrity, agent: Malicious Actors), and the mental well-being of users (stock: User Mental Health). Key agents include users, advertisers (incentive: Ad Reach), regulatory bodies (agent: Regulators, incentive: Compliance), and competitor platforms (agent: Competitors). We also need to consider the impact on our engineering resources (stock: Engineering Capacity) and server infrastructure (stock: Server Capacity).",
     icon: Search,
   },
   {
@@ -58,7 +58,7 @@ const goalOptions: GoalOption[] = [
     title: "Explore an Assertion",
     description: "Conduct a general exploration of an idea's cascading impacts.",
     promptLabel: "Enter your assertion or idea:",
-    placeholder: "The widespread adoption of fully autonomous vehicles for public and private transportation will fundamentally transform urban landscapes, labor markets (e.g., taxi drivers, truckers as agents), and the concept of personal mobility. This will impact city planning (agent), infrastructure investment (stock), public safety (stock), and potentially create new economic opportunities while displacing existing industries. Consider the interplay between technology developers (agent), regulatory bodies (agent), and public acceptance (stock).",
+    placeholder: "The widespread adoption of fully autonomous vehicles (concept: Autonomous Vehicles) for public and private transportation will fundamentally transform urban landscapes (stock: Urban Density), labor markets (e.g., taxi drivers, truckers as agents (agent: Transportation Workers), stock: Employment Rate in Transport), and the concept of personal mobility (stock: Mobility Access). This will impact city planning (agent: City Planners), infrastructure investment (stock: Infrastructure Quality), public safety (stock: Road Safety), and potentially create new economic opportunities (stock: New Business Creation) while displacing existing industries. Consider the interplay between technology developers (agent: AV Developers, incentive: Innovation Speed), regulatory bodies (agent: Regulators, incentive: Safety Standards), and public acceptance (stock: Public Trust in AVs).",
     icon: Target,
   }
 ];
@@ -821,9 +821,29 @@ export default function CascadeExplorerPage() {
           <Card className="shadow-xl bg-card"><CardHeader><CardTitle className="text-2xl text-primary">Step 1: Define Your Assertion</CardTitle><CardDescription>Enter your assertion, idea, or decision to explore, or select an example.</CardDescription></CardHeader><CardContent>
           <AssertionInputForm onSubmit={handleAssertionSubmit} isLoading={isLoading} initialAssertionText={currentAssertionText} onAssertionChange={setCurrentAssertionText} inputPromptLabel="Your Assertion / Idea / Decision:" placeholder="e.g., Implementing a universal basic income..."/>
           
-          <div className="mt-6 pt-4 border-t border-border"><h3 className="text-md font-semibold mb-3 text-accent">Or try an example:</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {goalOptions.map((goal) => (<Button key={goal.id} variant="outline" className="text-left h-auto py-2 px-3 justify-start hover:bg-accent/10" onClick={() => handleExampleButtonClick(goal.placeholder, goal.id)}> <goal.icon className="w-4 h-4 mr-2 shrink-0 text-primary" /> <div> <span className="block text-sm text-foreground">{goal.placeholder.substring(0,100) + (goal.placeholder.length > 100 ? '...' : '')}</span> <span className="block text-xs text-muted-foreground italic">({goal.title})</span></div></Button>))}
-          </div></div>
+          <div className="mt-6 pt-4 border-t border-border">
+            <h3 className="text-md font-semibold mb-3 text-accent">Or try an example:</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {goalOptions.map((goal) => (
+                <Button 
+                  key={goal.id} 
+                  variant="outline" 
+                  className="text-left h-auto py-2 px-3 justify-start hover:bg-accent/10 items-start" 
+                  onClick={() => handleExampleButtonClick(goal.placeholder, goal.id)}
+                > 
+                  {goal.icon && <goal.icon className="w-4 h-4 mr-2.5 mt-0.5 shrink-0 text-primary" />} 
+                  <div className="flex-grow"> 
+                    <span className="block text-sm text-foreground leading-snug">
+                      {goal.placeholder.substring(0,70) + (goal.placeholder.length > 70 ? '...' : '')}
+                    </span> 
+                    <span className="block text-xs text-muted-foreground italic mt-1">
+                      ({goal.title})
+                    </span>
+                  </div>
+                </Button>
+              ))}
+            </div>
+          </div>
           
           </CardContent></Card>
         );
