@@ -36,7 +36,7 @@ const goalOptions: GoalOption[] = [
     title: "Test a Decision",
     description: "See potential outcomes before committing to a choice.",
     promptLabel: "What decision are you considering?",
-    placeholder: "Our company is evaluating a major shift: investing heavily in renewable energy for all operations within the next decade. This plan involves significant upfront costs for new infrastructure and requires retraining our existing workforce. The main objective is to enhance our long-term sustainability and substantially reduce our carbon footprint, while also trying to manage the impact on immediate profit margins and potential disruptions to operational efficiency during this transition period. We will need to consider the perspectives of investors, employees, local communities, and regulatory bodies.",
+    placeholder: "Our company is thinking about switching all our operations to renewable energy over the next ten years. This would mean spending a lot on new equipment and retraining our staff. We want to be more sustainable and reduce our carbon footprint, but we also need to think about how this will affect our profits in the short term and if it might slow down our work during the change. We'll need to consider what investors, employees, local communities, and the government think about this.",
     icon: HelpCircle,
   },
   {
@@ -44,7 +44,7 @@ const goalOptions: GoalOption[] = [
     title: "Strengthen a Pitch",
     description: "Build an airtight argument for your idea or proposal.",
     promptLabel: "What idea or proposal are you trying to convince someone of?",
-    placeholder: "To revitalize our city's downtown core, we should implement a 'Pedestrian-First' initiative. This means converting Main Street into a car-free zone on weekends, investing in public art installations that reflect local culture, and offering tiered tax incentives to encourage unique small businesses to set up shop. The desired outcome is to boost local economic activity, improve community wellbeing by creating more attractive public spaces, and enhance the city's cultural vibrancy. This will involve the City Council, existing local business owners, city residents, and possibly urban planning consultants, each with their own interests and concerns regarding traffic, accessibility, and economic impact.",
+    placeholder: "To make our downtown area better, we should try a 'Pedestrians First' idea. This means closing Main Street to cars on weekends, putting up public art that shows our local culture, and giving tax breaks to unique small businesses to open up there. The goal is to get more local shopping, make people happier with nicer public areas, and make our city's culture more exciting. This involves the City Council, current local businesses, people living in the city, and maybe some city planning experts. They all have different views on traffic, access, and money.",
     icon: Brain,
   },
   {
@@ -52,7 +52,7 @@ const goalOptions: GoalOption[] = [
     title: "Find Blind Spots",
     description: "Uncover hidden risks and unintended consequences of a plan.",
     promptLabel: "What plan, change, or existing situation are you analyzing for risks?",
-    placeholder: "Our tech company plans to launch a new AI-powered social media platform designed for hyper-local community engagement. While the primary goal is rapid user growth and fostering neighborhood connections, a thorough risk analysis should consider user data security and privacy, algorithmic fairness in content promotion, the potential for localized misinformation to spread, and the mental well-being of users. These factors will influence advertisers, regulatory bodies, and our engineering and moderation teams, and also impact server infrastructure and operational costs.",
+    placeholder: "Our tech company is planning to launch a new AI-based social media app for local communities. We want to get a lot of users quickly and help neighbors connect. But, we need to look at the risks, like keeping user data safe and private, making sure our AI promotes content fairly, stopping local fake news from spreading, and how it might affect users' mental health. These things will matter to advertisers, the government, and our tech and safety teams. It will also affect our computer systems and how much it costs to run things.",
     icon: Search,
   },
   {
@@ -60,7 +60,7 @@ const goalOptions: GoalOption[] = [
     title: "Explore an Assertion",
     description: "Conduct a general exploration of an idea's cascading impacts.",
     promptLabel: "Enter your assertion or idea:",
-    placeholder: "The widespread adoption of fully Autonomous Vehicles for public and private transportation will fundamentally transform how cities are structured and how people live. This shift will affect urban planning due to reduced need for parking, labor markets for drivers, mobility access for various demographics, investment in transport solutions, road safety paradigms, and insurance models. It could also create new business opportunities while displacing existing industries. Key players include technology developers, regulatory bodies, insurance companies, and the general public, whose trust will be crucial.",
+    placeholder: "If self-driving cars become common for everyone, it will completely change our cities and how we live. It'll affect how we plan cities (less need for parking), jobs for drivers, how easy it is for different people to get around, money spent on transportation, road safety, and insurance. It could also create new businesses but might hurt existing ones. Tech companies, government rule-makers, insurance companies, and regular people (whose trust is important) will all be involved.",
     icon: Target,
   }
 ];
@@ -900,9 +900,9 @@ export default function CascadeExplorerPage() {
                   <TabsTrigger value="graph"><Workflow className="mr-2 h-4 w-4" />System Graph View</TabsTrigger>
                 </TabsList>
                  {reflectionViewMode === 'graph' && systemModelForDisplay && (
-                    <Card className="mt-0 shadow-md bg-card/50 border-input">
+                    <Card className="mt-0 shadow-md bg-card/50 border-input flex flex-col h-[500px]">
                         <CardHeader><CardTitle className="text-lg text-accent">System Model Graph (with Qualitative States)</CardTitle></CardHeader>
-                        <CardContent className="min-h-[300px] md:min-h-[400px]">
+                        <CardContent className="flex-grow">
                             <SystemModelGraph systemModel={systemModelForDisplay} />
                         </CardContent>
                     </Card>

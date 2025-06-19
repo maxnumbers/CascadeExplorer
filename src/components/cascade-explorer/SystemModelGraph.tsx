@@ -35,7 +35,6 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         description: stock.description,
         qualitativeState: stock.qualitativeState,
         baseColor: STOCK_COLOR,
-        x: undefined, y: undefined, vx: undefined, vy: undefined,
       });
     });
 
@@ -47,7 +46,6 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         type: 'agent',
         description: agent.description,
         baseColor: AGENT_COLOR,
-        x: undefined, y: undefined, vx: undefined, vy: undefined,
        });
     });
 
@@ -144,10 +142,10 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
     const simulation = d3.forceSimulation<SystemGraphNode>(d3Nodes)
       .force("link", d3.forceLink<SystemGraphNode, SystemGraphLink>(d3Links)
         .id(d => d.id)
-        .distance(200) // Increased distance
+        .distance(200) 
         .strength(0.4)
       )
-      .force("charge", d3.forceManyBody().strength(-600)) // Slightly less repulsion
+      .force("charge", d3.forceManyBody().strength(-600)) 
       .force("center", d3.forceCenter(0,0).strength(0.05))
       .force("collide", d3.forceCollide<SystemGraphNode>().radius(d => (d.type === 'stock' ? 60 : 40)).strength(0.9)); 
 
@@ -232,7 +230,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     const linkLabelElements = linkLabelGroup
       .selectAll("text")
-      .data(d3Links)
+      .data(d3Links) // Use the same d3Links data that forceLink uses
       .join("text")
       .attr("class", "link-label")
       .attr("font-size", "9px")
@@ -265,14 +263,14 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
             
       linkLabelElements
-        .attr("x", d => {
-            const sourceNode = d.source as SystemGraphNode;
-            const targetNode = d.target as SystemGraphNode;
+        .attr("x", (d: SystemGraphLink) => {
+            const sourceNode = d.source as SimulationNodeDatum; // d.source is a node object
+            const targetNode = d.target as SimulationNodeDatum; // d.target is a node object
             return ((sourceNode.x || 0) + (targetNode.x || 0)) / 2;
         })
-        .attr("y", d => {
-            const sourceNode = d.source as SystemGraphNode;
-            const targetNode = d.target as SystemGraphNode;
+        .attr("y", (d: SystemGraphLink) => {
+            const sourceNode = d.source as SimulationNodeDatum;
+            const targetNode = d.target as SimulationNodeDatum;
             return ((sourceNode.y || 0) + (targetNode.y || 0)) / 2 - 8; // Offset slightly above link
         });
     });
@@ -423,5 +421,3 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
 };
 
 export default SystemModelGraph;
-
-    
