@@ -254,7 +254,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
       nodeElements
         .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
-                    
+            
       linkLabelElements
           .attr("x", 0) // Simplified for testing
           .attr("y", 0); // Simplified for testing
