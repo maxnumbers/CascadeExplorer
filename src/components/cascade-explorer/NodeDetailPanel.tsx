@@ -23,7 +23,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Package, Users, TrendingUp, ArrowRightLeft, ShieldAlert, Info, ThumbsUp, ThumbsDown, Lightbulb, MinusCircle, FileText } from 'lucide-react';
+import { Package, Users, TrendingUp, ArrowRightLeft, ShieldAlert, Info, ThumbsUp, ThumbsDown, Lightbulb, MinusCircle, FileText, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 
 interface NodeDetailPanelProps {
   node: ImpactNode | null;
@@ -32,9 +32,53 @@ interface NodeDetailPanelProps {
   onUpdateValidity: (nodeId: string, validity: 'high' | 'medium' | 'low') => void;
   advancedViewEnabled?: boolean;
   masterSystemModel?: SystemModel | null;
+  previousSystemQualitativeStates?: Record<string, string> | null;
 }
 
-const renderAdvancedSystemModel = (systemModel: SystemModel) => {
+// Approximate ordinal scale for qualitative states. Lower is "worse".
+const QUALITATIVE_STATE_SCALE: Record<string, number> = {
+  'Critical': 0,
+  'Depleted': 1,
+  'Weak': 2,
+  'Strained': 3,
+  'Under Pressure': 4,
+  'Declining': 5, 
+  'Volatile': 6, 
+  'Moderate': 7,
+  'Stable': 8,  
+  'Improving': 9,
+  'Good': 10,
+  'Strong': 11,
+  'Growing': 12,
+  'Abundant': 13,
+};
+
+const renderAdvancedSystemModel = (
+    systemModel: SystemModel, 
+    previousStates: Record<string, string> | null | undefined
+  ) => {
+  
+  const getStateChangeIcon = (currentValue?: string, previousValue?: string) => {
+    if (!previousStates || previousValue === undefined || currentValue === undefined || currentValue === previousValue) {
+      return <MinusCircle className="w-3 h-3 text-muted-foreground inline-block ml-1.5" />;
+    }
+    const currentScore = QUALITATIVE_STATE_SCALE[currentValue];
+    const prevScore = QUALITATIVE_STATE_SCALE[previousValue];
+
+    if (currentScore === undefined || prevScore === undefined) {
+        // If one of the states is not in our scale, we can't compare ordinally
+        return <MinusCircle className="w-3 h-3 text-muted-foreground inline-block ml-1.5" title={`Changed from ${previousValue || 'N/A'}`} />;
+    }
+
+    if (currentScore > prevScore) {
+      return <ArrowUpCircle className="w-3 h-3 text-green-500 inline-block ml-1.5" />;
+    }
+    if (currentScore < prevScore) {
+      return <ArrowDownCircle className="w-3 h-3 text-red-500 inline-block ml-1.5" />;
+    }
+    return <MinusCircle className="w-3 h-3 text-muted-foreground inline-block ml-1.5" />;
+  };
+
   return (
     <div className="space-y-3">
       <div>
@@ -47,7 +91,12 @@ const renderAdvancedSystemModel = (systemModel: SystemModel) => {
             {systemModel.stocks.map((stock, index) => (
               <li key={`adv-stock-${index}`} className="p-1.5 border border-input rounded-md bg-background/30">
                 <strong className="text-foreground">{stock.name}</strong>
-                {stock.qualitativeState && <Badge variant="outline" className="ml-2 text-xs">{stock.qualitativeState}</Badge>}
+                {stock.qualitativeState && (
+                  <Badge variant="outline" className="ml-2 text-xs">
+                    {stock.qualitativeState}
+                    {getStateChangeIcon(stock.qualitativeState, previousStates?.[stock.name])}
+                  </Badge>
+                )}
                 {stock.description && <p className="text-muted-foreground mt-0.5">{stock.description}</p>}
               </li>
             ))}
@@ -173,7 +222,7 @@ const renderAdvancedTensionAnalysis = (tensionAnalysis: TensionAnalysisOutput) =
 };
 
 
-export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advancedViewEnabled, masterSystemModel }: NodeDetailPanelProps): JSX.Element | null {
+export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advancedViewEnabled, masterSystemModel, previousSystemQualitativeStates }: NodeDetailPanelProps): JSX.Element | null {
   if (!node) return null;
 
   const handleValidityChange = (newValidity: string) => {
@@ -190,12 +239,13 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
   const nodeTypeDisplay = node.nodeSystemType;
 
   const isCoreNode = node.id === CORE_ASSERTION_ID;
+  
   const systemModelForDisplay = (isCoreNode && masterSystemModel)
     ? masterSystemModel
     : (node.properties?.systemModel as SystemModel | undefined);
   
   const fullAssertionText = isCoreNode
-    ? node.properties?.fullAssertionText || node.description // Fallback to node.description for core assertion's full text
+    ? node.properties?.fullAssertionText || node.description 
     : undefined;
 
   const tensionAnalysis = isCoreNode ? node.properties?.tensionAnalysis as TensionAnalysisOutput | undefined : undefined;
@@ -213,6 +263,7 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
       )
     : {};
 
+  const systemModelLabelSuffix = (isCoreNode && masterSystemModel) ? "(Live States)" : "(Initial Snapshot)";
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -259,11 +310,10 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
                   <div className="space-y-1 border-t border-border pt-3 mt-3">
                       <Label className="font-semibold text-primary flex items-center">
                         <TrendingUp className="w-4 h-4 mr-2 text-accent"/>
-                        Advanced: System Model Details 
-                        {systemModelForDisplay === masterSystemModel ? " (Live States)" : " (Initial Snapshot)"}
+                        Advanced: System Model Details {systemModelLabelSuffix}
                       </Label>
                       <div className="mt-1 p-2 border border-input rounded-md bg-background/10">
-                        {renderAdvancedSystemModel(systemModelForDisplay)}
+                        {renderAdvancedSystemModel(systemModelForDisplay, previousSystemQualitativeStates)}
                       </div>
                   </div>
                 )}
@@ -349,5 +399,3 @@ export function NodeDetailPanel({ node, isOpen, onClose, onUpdateValidity, advan
   );
 }
 
-
-    

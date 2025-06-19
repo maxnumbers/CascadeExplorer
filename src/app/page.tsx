@@ -11,7 +11,7 @@ import { suggestImpactConsolidation, type SuggestImpactConsolidationOutput, type
 import { generateCascadeSummary, type CascadeSummaryInput, type CascadeSummaryOutput } from '@/ai/flows/generate-cascade-summary';
 import { reviseSystemModelWithFeedback, type ReviseSystemModelInput, type ReviseSystemModelOutput } from '@/ai/flows/revise-system-model-with-feedback';
 import type { ImpactNode, ImpactLink, Impact, ImpactMappingInputForConsolidation, StructuredConcept, GoalOption, SystemModel } from '@/types/cascade';
-import { ExplorerStep } from '@/types/cascade';
+import { ExplorerStep, CORE_ASSERTION_ID } from '@/types/cascade';
 import { AssertionInputForm } from '@/components/cascade-explorer/AssertionInputForm';
 import { ReflectionDisplay } from '@/components/cascade-explorer/ReflectionDisplay';
 import { TensionAnalysisDisplay } from '@/components/cascade-explorer/TensionAnalysisDisplay';
@@ -27,8 +27,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Zap, Lightbulb, ArrowRightCircle, ListChecks, FileText, RotateCcw, HelpCircle, Brain, Target, Search, Sparkles, List, Workflow, MessageSquareText, Edit3, ShieldAlert, AlertTriangle, Info, Settings2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const CORE_ASSERTION_ID = 'core-assertion';
 
 const goalOptions: GoalOption[] = [
   {
@@ -71,6 +69,7 @@ export default function CascadeExplorerPage() {
   const [reflectionResult, setReflectionResult] = useState<AIReflectAssertionOutput | null>(null);
   const [initialSystemStatesSummary, setInitialSystemStatesSummary] = useState<string | null>(null);
   const [currentSystemQualitativeStates, setCurrentSystemQualitativeStates] = useState<Record<string, string> | null>(null);
+  const [previousSystemQualitativeStates, setPreviousSystemQualitativeStates] = useState<Record<string, string> | null>(null);
   const [allFeedbackLoopInsights, setAllFeedbackLoopInsights] = useState<string[]>([]);
   const [tensionAnalysisResult, setTensionAnalysisResult] = useState<TensionAnalysisOutput | null>(null);
 
@@ -120,6 +119,7 @@ export default function CascadeExplorerPage() {
     setReflectionResult(null);
     setInitialSystemStatesSummary(null);
     setCurrentSystemQualitativeStates(null);
+    setPreviousSystemQualitativeStates(null); 
     setAllFeedbackLoopInsights([]);
     setTensionAnalysisResult(null);
     setAllImpactNodes([]);
@@ -179,11 +179,9 @@ export default function CascadeExplorerPage() {
       };
       const result = await reviseSystemModelWithFeedback(input);
       if (result && result.revisedSystemModel) {
-        // After revision, re-sync reflectionResult.systemModel
         setReflectionResult(prev => {
             if (!prev) return null;
             const newSystemModel = result.revisedSystemModel;
-            // If currentSystemQualitativeStates exist, try to map them to the new/revised model
             if (currentSystemQualitativeStates) {
                 const updatedStocksWithStates = newSystemModel.stocks.map(stock => {
                     const existingState = currentSystemQualitativeStates[stock.name];
@@ -237,7 +235,7 @@ export default function CascadeExplorerPage() {
   ) => {
     if (!currentReflectionForTensions?.systemModel) {
         toast({ title: "Missing System Model", description: "Cannot identify tensions without a system model.", variant: "destructive" });
-        setUiStep(ExplorerStep.INITIAL_STATE_REVIEW); // Revert to a logical previous step
+        setUiStep(ExplorerStep.INITIAL_STATE_REVIEW);
         return;
     }
     setUiStep(ExplorerStep.TENSION_ANALYSIS_PENDING);
@@ -268,10 +266,12 @@ export default function CascadeExplorerPage() {
   const handleConfirmReflectionAndInferInitialStates = useCallback(async () => {
     if (!reflectionResult || !currentAssertionText || !reflectionResult.systemModel) {
         toast({ title: "Missing Context", description: "Cannot infer initial states without a confirmed assertion and system model.", variant: "destructive" });
-        setUiStep(ExplorerStep.REFLECTION_REVIEW); // Stay or revert to reflection review
+        setUiStep(ExplorerStep.REFLECTION_REVIEW);
         return;
     }
     setUiStep(ExplorerStep.INFERRING_INITIAL_STATE);
+    setPreviousSystemQualitativeStates(null); // Reset previous states before new inference cycle
+
     try {
         const inferInput: InferInitialQualitativeStateInput = {
             assertionText: currentAssertionText, 
@@ -283,7 +283,7 @@ export default function CascadeExplorerPage() {
             ...reflectionResult, 
             systemModel: stateInferenceResult.systemModelWithQualitativeStates 
         };
-        setReflectionResult(updatedReflectionWithStates); // This contains the model with initial states
+        setReflectionResult(updatedReflectionWithStates);
         setInitialSystemStatesSummary(stateInferenceResult.initialStatesSummary);
 
         const initialStates: Record<string, string> = {};
@@ -292,11 +292,9 @@ export default function CascadeExplorerPage() {
                 initialStates[stock.name] = stock.qualitativeState;
             }
         });
-        setCurrentSystemQualitativeStates(initialStates); // Set the baseline qualitative states
+        setCurrentSystemQualitativeStates(initialStates);
         
-        // Proceed to tension analysis using the model that now has initial states
         await handleIdentifyTensions(updatedReflectionWithStates, currentAssertionText);
-        // uiStep will be set by handleIdentifyTensions (TENSION_ANALYSIS_PENDING then TENSION_ANALYSIS_REVIEW or back)
 
     } catch (error: any) {
         console.error("Error inferring initial qualitative states:", error);
@@ -309,7 +307,7 @@ export default function CascadeExplorerPage() {
         toast({ title: "Error Inferring Initial States", description: errorMessage, variant: "destructive", duration: 7000 });
         setUiStep(ExplorerStep.REFLECTION_REVIEW); 
     }
-  }, [reflectionResult, currentAssertionText, toast, setUiStep, setReflectionResult, setInitialSystemStatesSummary, setCurrentSystemQualitativeStates, handleIdentifyTensions]);
+  }, [reflectionResult, currentAssertionText, toast, setUiStep, setReflectionResult, setInitialSystemStatesSummary, setCurrentSystemQualitativeStates, handleIdentifyTensions, setPreviousSystemQualitativeStates]);
   
   const fetchImpactsForOrder = useCallback(async (targetPhase: '1' | '2' | '3', parentNodesForLinking: ImpactNode[]) => {
     if (!currentAssertionText || !reflectionResult || !reflectionResult.systemModel || !currentSystemQualitativeStates) {
@@ -321,19 +319,12 @@ export default function CascadeExplorerPage() {
     const coreNodeForProps = allImpactNodesRef.current.find(n => n.id === CORE_ASSERTION_ID);
     const currentTensionAnalysisToUse = tensionAnalysisResult || coreNodeForProps?.properties?.tensionAnalysis;
 
-
     if (targetPhase === '1' && !currentTensionAnalysisToUse) {
         toast({ title: "Missing Tension Analysis", description: "Tension analysis is required before generating Phase 1 consequences.", variant: "destructive" });
         setUiStep(ExplorerStep.TENSION_ANALYSIS_REVIEW);
         return;
     }
     
-    console.log(`[fetchImpactsForOrder] Called for Phase: ${targetPhase}`);
-    console.log("[fetchImpactsForOrder] Parent nodes for linking (sent to AI):", parentNodesForLinking.map(p => ({id: p.id, label:p.label})));
-    console.log("[fetchImpactsForOrder] Current System Qualitative States (sent to AI):", currentSystemQualitativeStates);
-    console.log("[fetchImpactsForOrder] Tension Analysis to be used:", currentTensionAnalysisToUse);
-
-
     let currentLoadingStep: ExplorerStep = ExplorerStep.ORDER_1_PENDING; 
     let currentReviewStep: ExplorerStep = ExplorerStep.ORDER_1_REVIEW;
 
@@ -344,7 +335,6 @@ export default function CascadeExplorerPage() {
         currentLoadingStep = ExplorerStep.ORDER_3_PENDING; currentReviewStep = ExplorerStep.ORDER_3_REVIEW;
     }
 
-
     if ((targetPhase === '2' || targetPhase === '3') && parentNodesForLinking.length === 0) {
         toast({ title: `No Parent Impacts`, description: `Cannot generate Phase ${targetPhase} consequences as no impacts from the previous phase exist.`, variant: "default" });
         if (targetPhase === '2') setUiStep(ExplorerStep.ORDER_1_REVIEW);
@@ -354,6 +344,7 @@ export default function CascadeExplorerPage() {
 
     setUiStep(currentLoadingStep);
     setConsolidationSuggestions(null);
+    setPreviousSystemQualitativeStates(currentSystemQualitativeStates); // Capture states before AI call
 
     try {
       const aiInput: AIGenerateImpactsByOrderInput = {
@@ -365,7 +356,6 @@ export default function CascadeExplorerPage() {
         systemModel: reflectionResult.systemModel, 
       };
       const result: GeneratePhaseConsequencesOutput = await generateImpactsByOrder(aiInput);
-      console.log("[fetchImpactsForOrder] Raw result from AI:", JSON.parse(JSON.stringify(result)));
 
       const rawGeneratedImpacts = result.generatedImpacts || [];
        const validGeneratedImpacts = rawGeneratedImpacts.filter(impact => {
@@ -377,7 +367,6 @@ export default function CascadeExplorerPage() {
         const parentIdCheck = targetPhase === '1' || (impact.parentId && impact.parentId.trim() !== "");
         return hasEssentialFields && parentIdCheck;
       });
-
 
       const newNodesFromAI: ImpactNode[] = validGeneratedImpacts.map(impact => ({
         id: impact.id,
@@ -418,7 +407,6 @@ export default function CascadeExplorerPage() {
                 finalNewNodesWithUpdatedParentIds.push(newNode);
                 newLinksGeneratedThisStep.push({ source: parentNodeFromGraph.id, target: newNode.id });
             } else {
-                console.warn(`[fetchImpactsForOrder] Impact "${newNode.label}" (Phase ${targetPhase}) specified parentId ('${aiParentId}') not found or not in preceding phase. Fallback needed.`);
                 if (parentNodesForLinking.length > 0) {
                     const fallbackParent = parentNodesForLinking[0]; 
                     const nodeWithFallbackParent = { ...newNode, parentId: fallbackParent.id };
@@ -451,7 +439,6 @@ export default function CascadeExplorerPage() {
         };
         setCurrentSystemQualitativeStates(newQualitativeStates);
         
-        // Update reflectionResult.systemModel.stocks with new qualitative states
         setReflectionResult(prev => {
             if (!prev || !prev.systemModel) return prev;
             const updatedStocks = prev.systemModel.stocks.map(stock => ({
@@ -460,11 +447,9 @@ export default function CascadeExplorerPage() {
             }));
             return { ...prev, systemModel: { ...prev.systemModel, stocks: updatedStocks }};
         });
-        console.log("[fetchImpactsForOrder] Updated System Qualitative States:", result.updatedSystemQualitativeStates);
       }
       if (result.feedbackLoopInsights && result.feedbackLoopInsights.length > 0) {
         setAllFeedbackLoopInsights(prevInsights => [...prevInsights, ...result.feedbackLoopInsights!]);
-        console.log("[fetchImpactsForOrder] Added Feedback Loop Insights:", result.feedbackLoopInsights);
       }
 
       setUiStep(currentReviewStep);
@@ -484,7 +469,7 @@ export default function CascadeExplorerPage() {
       else if (targetPhase === '3') setUiStep(ExplorerStep.ORDER_2_REVIEW);
       else setUiStep(ExplorerStep.INITIAL);
     }
-  }, [currentAssertionText, reflectionResult, tensionAnalysisResult, currentSystemQualitativeStates, mapImpactNodeToImpact, toast, allImpactNodesRef, graphLinksRef, setUiStep, setConsolidationSuggestions, setCurrentSystemQualitativeStates, setAllFeedbackLoopInsights, setAllImpactNodes, setGraphLinks, setReflectionResult]);
+  }, [currentAssertionText, reflectionResult, tensionAnalysisResult, currentSystemQualitativeStates, mapImpactNodeToImpact, toast, allImpactNodesRef, graphLinksRef, setUiStep, setConsolidationSuggestions, setCurrentSystemQualitativeStates, setAllFeedbackLoopInsights, setAllImpactNodes, setGraphLinks, setReflectionResult, setPreviousSystemQualitativeStates]);
 
 
   const handleProceedFromTensionAnalysisToFirstOrder = useCallback(async () => {
@@ -492,6 +477,7 @@ export default function CascadeExplorerPage() {
       toast({ title: "Missing Context", description: "Cannot generate impacts without confirmed assertion, system model with qualitative states, and tension analysis.", variant: "destructive" });
       return;
     }
+    setPreviousSystemQualitativeStates(currentSystemQualitativeStates); // Capture initial states as "previous" before first impact phase
 
     const coreNode: ImpactNode = {
       id: CORE_ASSERTION_ID,
@@ -507,7 +493,7 @@ export default function CascadeExplorerPage() {
       parentId: undefined,
       properties: {
         fullAssertionText: currentAssertionText,
-        systemModel: reflectionResult.systemModel, // This model includes initial qualitative states
+        systemModel: reflectionResult.systemModel,
         keyConcepts: reflectionResult.keyConcepts || [],
         tensionAnalysis: tensionAnalysisResult,
         initialSystemStatesSummary: initialSystemStatesSummary,
@@ -518,9 +504,8 @@ export default function CascadeExplorerPage() {
     setGraphLinks([]); 
     await Promise.resolve();
 
-    console.log("[handleProceedFromTensionAnalysisToFirstOrder] Core node created, proceeding to fetch Phase 1 impacts.");
     await fetchImpactsForOrder('1', [coreNode]);
-  }, [reflectionResult, currentAssertionText, tensionAnalysisResult, fetchImpactsForOrder, toast, initialSystemStatesSummary, currentSystemQualitativeStates, setAllImpactNodes, setGraphLinks]);
+  }, [reflectionResult, currentAssertionText, tensionAnalysisResult, fetchImpactsForOrder, toast, initialSystemStatesSummary, currentSystemQualitativeStates, setAllImpactNodes, setGraphLinks, setPreviousSystemQualitativeStates]);
 
   const handleGenerateCascadeSummary = useCallback(async () => {
     if (!reflectionResult || allImpactNodesRef.current.length <=1 ) {
@@ -572,7 +557,6 @@ export default function CascadeExplorerPage() {
     let parentNodesForLinking: ImpactNode[] = [];
 
     const currentNodesSnapshot = allImpactNodesRef.current;
-    console.log("[handleProceedToNextOrder] Called. Current uiStep:", ExplorerStep[uiStep]);
 
     if (uiStep === ExplorerStep.ORDER_1_REVIEW) { 
       nextPhaseToFetch = '2'; 
@@ -592,15 +576,13 @@ export default function CascadeExplorerPage() {
       if (parentNodesForLinking.length === 0 && nextPhaseToFetch > '1') {
         toast({ title: `No Parent Impacts`, description: `Cannot generate Phase ${nextPhaseToFetch} as no impacts from the previous phase exist. Proceeding to summary if applicable.`, variant: "default" });
         if (nextPhaseToFetch === '2' && uiStep === ExplorerStep.ORDER_1_REVIEW) {
-            setUiStep(ExplorerStep.ORDER_2_REVIEW); // Effectively skip to next review step
+            setUiStep(ExplorerStep.ORDER_2_REVIEW); 
         } else if (nextPhaseToFetch === '3' && uiStep === ExplorerStep.ORDER_2_REVIEW) {
-            setUiStep(ExplorerStep.ORDER_3_REVIEW); // Effectively skip to next review step
+            setUiStep(ExplorerStep.ORDER_3_REVIEW); 
         }
         return;
       }
       await fetchImpactsForOrder(nextPhaseToFetch, parentNodesForLinking);
-    } else {
-        console.warn("[handleProceedToNextOrder] Called from unexpected uiStep:", ExplorerStep[uiStep]);
     }
   }, [uiStep, fetchImpactsForOrder, handleGenerateCascadeSummary, toast, allImpactNodesRef, setUiStep]);
 
@@ -631,7 +613,6 @@ export default function CascadeExplorerPage() {
         if (originalNodes.length !== suggestion.originalImpactIds.length || originalNodes.length === 0) return false;
         const firstOriginalOrder = originalNodes[0].order;
         if (!originalNodes.every(node => node.order === firstOriginalOrder)) return false;
-        // Ensure consolidatedImpact.order is a string '0', '1', '2', or '3' before parsing
         const consolidatedOrderString = typeof suggestion.consolidatedImpact.order === 'number' 
             ? String(suggestion.consolidatedImpact.order) 
             : suggestion.consolidatedImpact.order as string;
@@ -669,7 +650,6 @@ export default function CascadeExplorerPage() {
   };
 
   const handleApplyConsolidation = (suggestion: ConsolidatedImpactSuggestion) => {
-    console.log("[handleApplyConsolidation] Applying suggestion:", JSON.parse(JSON.stringify(suggestion)));
     const { originalImpactIds, consolidatedImpact: suggestedConsolidatedImpact } = suggestion;
     if (!originalImpactIds || originalImpactIds.length < 2) {
         toast({title: "Invalid Suggestion", description: "Cannot apply consolidation, suggestion is missing original impact IDs or has too few.", variant:"destructive"});
@@ -868,6 +848,12 @@ export default function CascadeExplorerPage() {
                         </Button>
                     </>
                 )}
+                 {uiStep === ExplorerStep.INITIAL_STATE_REVIEW && (
+                     <Button onClick={handleConfirmReflectionAndInferInitialStates} disabled={isLoading || uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.REVISING_SYSTEM_MODEL || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING} className="w-full bg-primary text-primary-foreground">
+                        {(isLoading && (uiStep === ExplorerStep.INFERRING_INITIAL_STATE || uiStep === ExplorerStep.TENSION_ANALYSIS_PENDING)) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Brain className="mr-2 h-4 w-4" />}
+                        {currentSystemQualitativeStates ? "Re-Infer States & Proceed to Tensions" : "Confirm & Infer Initial System States"}
+                    </Button>
+                 )}
             </CardFooter>
           </Card>
         );
@@ -944,13 +930,13 @@ export default function CascadeExplorerPage() {
         [ExplorerStep.GENERATING_SUMMARY]: "Impact Network (Full System Evolution - Generating Summary)",
         [ExplorerStep.FINAL_REVIEW]: "Impact Network (Full System Evolution)",
         [ExplorerStep.CONSOLIDATION_PENDING]: "Impact Network (Analyzing Consolidations)",
-        [ExplorerStep.INITIAL]: "Define Your Assertion", // Should not be reached if graph is visible
-        [ExplorerStep.REFLECTION_PENDING]: "Reflecting...", // Should not be reached if graph is visible
-        [ExplorerStep.REVISING_SYSTEM_MODEL]: "Revising Model...", // Should not be reached
-        [ExplorerStep.INFERRING_INITIAL_STATE]: "Inferring States...", // Should not be reached
-        [ExplorerStep.INITIAL_STATE_REVIEW]: "Impact Network (Review Initial State)", // Covered by earlier condition
-        [ExplorerStep.TENSION_ANALYSIS_PENDING]: "Analyzing Tensions...", // Should not be reached
-        [ExplorerStep.TENSION_ANALYSIS_REVIEW]: "Impact Network (Review Tensions)", // Covered by earlier condition
+        [ExplorerStep.INITIAL]: "Define Your Assertion", 
+        [ExplorerStep.REFLECTION_PENDING]: "Reflecting...", 
+        [ExplorerStep.REVISING_SYSTEM_MODEL]: "Revising Model...", 
+        [ExplorerStep.INFERRING_INITIAL_STATE]: "Inferring States...", 
+        [ExplorerStep.INITIAL_STATE_REVIEW]: "Impact Network (Review Initial State)", 
+        [ExplorerStep.TENSION_ANALYSIS_PENDING]: "Analyzing Tensions...", 
+        [ExplorerStep.TENSION_ANALYSIS_REVIEW]: "Impact Network (Review Tensions)", 
     };
     return phaseTextMap[uiStep] || "Impact Network";
   };
@@ -1023,6 +1009,7 @@ export default function CascadeExplorerPage() {
         onUpdateValidity={handleUpdateValidity} 
         advancedViewEnabled={advancedViewEnabled}
         masterSystemModel={reflectionResult?.systemModel}
+        previousSystemQualitativeStates={previousSystemQualitativeStates}
       />
       <footer className="mt-12 text-center text-sm text-muted-foreground"><p>&copy; {new Date().getFullYear()} Cascade Explorer. Powered by Firebase Studio &amp; Genkit.</p></footer>
     </div>
