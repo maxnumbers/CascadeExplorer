@@ -266,8 +266,9 @@ export interface SystemGraphNode extends SimulationNodeDatum {
 }
 
 export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
-  source: string; // ID of source SystemGraphNode
-  target: string; // ID of target SystemGraphNode
+  // Source and target are inherited from SimulationLinkDatum<SystemGraphNode>.
+  // They will be string IDs initially, and D3's forceLink will update them
+  // to be references to the actual SystemGraphNode objects.
   label: string;  // Primary, potentially longer descriptive label for the link (e.g., full incentiveDescription or full flowDescription)
   displayedText: string; // The concise text to show on the graph edge, derived from AI's concise fields.
   detailText?: string; // Optional further details for tooltip (e.g., the other part of an incentive or flow)
