@@ -257,7 +257,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
       linkLabelElements
         .attr("x", d => (((d.source as SystemGraphNode).x || 0) + ((d.target as SystemGraphNode).x || 0)) / 2)
-        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 8)); // Offset slightly above link
+        .attr("y", d => (((d.source as SystemGraphNode).y || 0) + ((d.target as SystemGraphNode).y || 0)) / 2 - 8)) // Removed semicolon
     });
 
     simulation.alpha(0.8).restart();
@@ -422,4 +422,3 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
 };
 
 export default SystemModelGraph;
-
