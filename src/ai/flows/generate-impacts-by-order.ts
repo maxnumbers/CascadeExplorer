@@ -50,6 +50,7 @@ const phasePrompt = ai.definePrompt({
   input: {schema: PhasePromptInternalInputSchema}, // Use the internal schema with boolean flags
   output: {schema: GeneratePhaseConsequencesOutputSchema},
   prompt: `You are a Systems Dynamics Analyst. Your task is to model the evolution of a system through qualitative phases, considering its current state, tensions, and how impacts create feedback loops.
+Your goal is to create a rich, branching network of consequences. While some impacts may arise from the confluence of multiple parents, each parent or distinct group of parents should also inspire multiple, diverse downstream effects. Avoid premature consolidation unless impacts are truly redundant.
 
 Overall Assertion: "{{assertionText}}"
 
@@ -76,17 +77,21 @@ Incorporate these tensions into your reasoning. How might they shape the consequ
 We are generating consequences for:
 {{#if isPhase1}}**Phase 1: Initial Consequences** (Direct effects of the assertion given initial states and tensions).
   Parent context: The main assertion "{{assertionText}}".
-  Number of distinct consequences to generate: 3 or more.
+  Generate a diverse set of 3-5 distinct immediate outcomes (positive, negative, neutral). Consider different facets and stakeholders.
 {{/if}}
 {{#if isPhase2}}**Phase 2: Transition Phase Consequences** (Effects stemming from Initial Consequences, considering evolving system states and tensions).
   Parent Impacts from Phase 1 (these are the direct influences for this phase's consequences):
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
-  Number of distinct consequences to generate: 2 or more for this phase, potentially linking to one or more of the provided parent impacts.
+  For EACH parent impact from Phase 1, try to generate 1-2 distinct child consequences.
+  Additionally, if a logical CONFLUENCE of SEVERAL parent impacts from Phase 1 would lead to a new, distinct consequence, generate that as well (linking it to all relevant parents).
+  Overall, aim for a total of 3-4 distinct consequences for this Transition Phase, ensuring they branch out and explore different paths.
 {{/if}}
 {{#if isPhase3}}**Phase 3: Stabilization Phase Consequences** (Longer-term shifts and emergent system behaviors as it moves towards new equilibriums).
   Parent Impacts from Phase 2 (these are the direct influences for this phase's consequences):
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
-  Number of distinct consequences to generate: 1 or more for this phase, potentially linking to one or more of the provided parent impacts.
+  For EACH parent impact from Phase 2, try to generate 1-2 distinct child consequences.
+  Additionally, if a logical CONFLUENCE of SEVERAL parent impacts from Phase 2 would lead to a new, distinct consequence, generate that as well (linking it to all relevant parents).
+  Overall, aim for a total of 2-3 distinct consequences for this Stabilization Phase, representing significant long-term shifts or emergent behaviors.
 {{/if}}
 
 For each consequence you generate (to be included in the 'generatedImpacts' array):
