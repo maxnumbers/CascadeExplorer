@@ -57,8 +57,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
       if (agentNode && stockNode) {
         links.push({
-          source: agentNode.id, // String ID
-          target: stockNode.id, // String ID
+          source: agentNode.id, 
+          target: stockNode.id, 
           label: incentive.incentiveDescription, 
           displayedText: incentive.resultingFlow || incentive.incentiveDescription.substring(0,20) + (incentive.incentiveDescription.length > 20 ? "..." : ""), 
           detailText: incentive.resultingFlow && incentive.resultingFlow !== incentive.incentiveDescription ? incentive.resultingFlow : undefined,
@@ -77,8 +77,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
         if (sourceNode && targetNode) {
             links.push({
-                source: sourceNode.id, // String ID
-                target: targetNode.id, // String ID
+                source: sourceNode.id, 
+                target: targetNode.id, 
                 label: flow.flowDescription, 
                 displayedText: flow.flowDescription, 
                 detailText: flow.drivingForceDescription,
@@ -131,8 +131,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", LINK_COLOR);
     
-    const getRefXForMarker = (targetNode: SystemGraphNode | string | undefined) => {
-        const node = typeof targetNode === 'string' ? d3Nodes.find(n => n.id === targetNode) : targetNode;
+    const getRefXForMarker = (targetNode: SystemGraphNode | string | number | d3.SimulationNodeDatum | undefined) => {
+        const node = typeof targetNode === 'string' || typeof targetNode === 'number' ? d3Nodes.find(n => n.id === targetNode) : targetNode as SystemGraphNode;
         if (node?.type === 'stock') return 47; 
         if (node?.type === 'agent') return 30; 
         return 15; 
@@ -141,37 +141,37 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     const simulation = d3.forceSimulation<SystemGraphNode>(d3Nodes)
       .force("link", d3.forceLink<SystemGraphNode, SystemGraphLink>(d3Links)
-        .id(d => d.id)
+        .id(d_node => d_node.id)
         .distance(200) 
         .strength(0.4)
       )
       .force("charge", d3.forceManyBody().strength(-600)) 
       .force("center", d3.forceCenter(0,0).strength(0.05))
-      .force("collide", d3.forceCollide<SystemGraphNode>().radius(d => (d.type === 'stock' ? 60 : 40)).strength(0.9)); 
+      .force("collide", d3.forceCollide<SystemGraphNode>().radius(d_node => (d_node.type === 'stock' ? 60 : 40)).strength(0.9)); 
 
     const linkElements = svg.append("g")
       .attr("class", "links")
       .attr("stroke", LINK_COLOR)
       .attr("stroke-opacity", 0.7)
       .selectAll("line")
-      .data(d3Links, (d: any) => `${typeof d.source === 'object' ? d.source.id : d.source}-${typeof d.target === 'object' ? d.target.id : d.target}`)
+      .data(d3Links, (d_link: any) => `${(d_link.source as SystemGraphNode).id || d_link.source}-${(d_link.target as SystemGraphNode).id || d_link.target}`)
       .join("line")
       .attr("stroke-width", 1.5)
       .attr("marker-end", "url(#end-arrow)")
-      .each(function(d) { 
+      .each(function(d_link) { 
           const marker = svg.select("#end-arrow"); 
-          marker.attr("refX", getRefXForMarker(d.target as SystemGraphNode));
+          marker.attr("refX", getRefXForMarker(d_link.target));
       });
 
 
     const nodeElements = svg.append("g")
       .attr("class", "nodes")
       .selectAll("g")
-      .data(d3Nodes, (d: SystemGraphNode) => d.id)
+      .data(d3Nodes, (d_node: SystemGraphNode) => d_node.id)
       .join("g")
       .call(drag(simulation) as any);
 
-    nodeElements.filter(d => d.type === 'stock')
+    nodeElements.filter(d_node => d_node.type === 'stock')
       .append("rect")
       .attr("width", 90)  
       .attr("height", 50) 
@@ -179,35 +179,35 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("ry", 6)
       .attr("x", -45) 
       .attr("y", -25) 
-      .attr("fill", d => d.baseColor)
-      .attr("stroke", d => d3.color(d.baseColor)?.darker(0.5).toString() || '#000000')
+      .attr("fill", d_node => d_node.baseColor)
+      .attr("stroke", d_node => d3.color(d_node.baseColor)?.darker(0.5).toString() || '#000000')
       .attr("stroke-width", 1.5);
 
-    nodeElements.filter(d => d.type === 'agent')
+    nodeElements.filter(d_node => d_node.type === 'agent')
       .append("circle")
       .attr("r", 28) 
-      .attr("fill", d => d.baseColor)
-      .attr("stroke", d => d3.color(d.baseColor)?.darker(0.5).toString() || '#000000')
+      .attr("fill", d_node => d_node.baseColor)
+      .attr("stroke", d_node => d3.color(d_node.baseColor)?.darker(0.5).toString() || '#000000')
       .attr("stroke-width", 1.5);
 
     const labelElements = nodeElements.append("text")
       .attr("font-size", "10px")
       .attr("font-weight", "600") 
-      .attr("fill", d => { 
-        if (d.type === 'stock') return 'hsl(var(--primary-foreground))';
-        if (d.type === 'agent') return 'hsl(var(--accent-foreground))';
+      .attr("fill", d_node => { 
+        if (d_node.type === 'stock') return 'hsl(var(--primary-foreground))';
+        if (d_node.type === 'agent') return 'hsl(var(--accent-foreground))';
         return 'hsl(var(--foreground))'; 
       })
       .attr("text-anchor", "middle")
       .style("pointer-events", "none")
-      .each(function(d) { 
+      .each(function(d_node) { 
         const g = d3.select(this);
         g.append("tspan")
             .attr("x", 0)
-            .attr("dy", d.type === 'stock' && d.qualitativeState ? "-0.3em" : "0.35em") 
-            .text(d.label);
+            .attr("dy", d_node.type === 'stock' && d_node.qualitativeState ? "-0.3em" : "0.35em") 
+            .text(d_node.label);
         
-        if (d.type === 'stock' && d.qualitativeState) {
+        if (d_node.type === 'stock' && d_node.qualitativeState) {
             g.append("tspan")
                 .attr("x", 0)
                 .attr("dy", "1.2em") 
@@ -215,14 +215,14 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
                 .attr("font-style", "italic")
                 .attr("fill", 'hsl(var(--primary-foreground))') 
                 .style("opacity", 0.85) 
-                .text(`(${d.qualitativeState})`);
+                .text(`(${d_node.qualitativeState})`);
         }
       })
       .call(wrapStockText, 80); 
 
 
     nodeElements.append("title")
-      .text(d => `${d.label}${d.qualitativeState ? ` (${d.qualitativeState})` : ''}${d.description ? `\nDescription: ${d.description}` : ''}`);
+      .text(d_node => `${d_node.label}${d_node.qualitativeState ? ` (${d_node.qualitativeState})` : ''}${d_node.description ? `\nDescription: ${d_node.description}` : ''}`);
 
     const linkLabelGroup = svg.append("g")
       .attr("class", "link-labels");
@@ -238,8 +238,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("paint-order", "stroke")
       .attr("stroke", BG_COLOR) 
       .attr("stroke-width", "0.25em") 
-      .text(d => {
-        const textToShow = d.displayedText;
+      .text(d_link => {
+        const textToShow = d_link.displayedText;
         if (textToShow && textToShow.length > 25) { 
             return textToShow.substring(0, 22) + "...";
         }
@@ -248,30 +248,36 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .call(wrapLinkText, 70); 
 
     linkLabelElements.append("title")
-        .text(d => `${d.type === 'incentive' ? 'Incentive' : 'Flow'}: ${d.label}${d.detailText ? `\nDetails: ${d.detailText}` : ''}`);
+        .text(d_link => `${d_link.type === 'incentive' ? 'Incentive' : 'Flow'}: ${d_link.label}${d_link.detailText ? `\nDetails: ${d_link.detailText}` : ''}`);
 
 
     simulation.on("tick", () => {
       linkElements
-        .attr("x1", d => (d.source as SystemGraphNode).x || 0)
-        .attr("y1", d => (d.source as SystemGraphNode).y || 0)
-        .attr("x2", d => (d.target as SystemGraphNode).x || 0)
-        .attr("y2", d => (d.target as SystemGraphNode).y || 0);
+        .attr("x1", d_link => (d_link.source as SystemGraphNode).x || 0)
+        .attr("y1", d_link => (d_link.source as SystemGraphNode).y || 0)
+        .attr("x2", d_link => (d_link.target as SystemGraphNode).x || 0)
+        .attr("y2", d_link => (d_link.target as SystemGraphNode).y || 0);
 
       nodeElements
-        .attr("transform", d => `translate(${d.x || 0},${d.y || 0})`);
+        .attr("transform", d_node => `translate(${d_node.x || 0},${d_node.y || 0})`);
             
-      linkLabelElements
-        .attr("x", (linkData: SystemGraphLink) => {
-            const sourceNode = linkData.source as SystemGraphNode;
-            // Diagnostic: Position directly at source node x
-            return sourceNode.x || 0; 
-        })
-        .attr("y", (linkData: SystemGraphLink) => {
-            const sourceNode = linkData.source as SystemGraphNode;
-            // Diagnostic: Position directly at source node y
-            return sourceNode.y || 0;
-        });
+      linkLabelElements.each(function(d_link: SystemGraphLink) {
+        const linkTextElement = d3.select(this);
+        const sourceNode = d_link.source as SystemGraphNode; // After simulation, these are node objects
+        const targetNode = d_link.target as SystemGraphNode;
+
+        let newX = 0;
+        let newY = 0;
+
+        if (sourceNode.x !== undefined && targetNode.x !== undefined) {
+          newX = (sourceNode.x + targetNode.x) / 2;
+        }
+        if (sourceNode.y !== undefined && targetNode.y !== undefined) {
+          newY = (sourceNode.y + targetNode.y) / 2 - 8; // Offset slightly above link
+        }
+        
+        linkTextElement.attr("x", newX).attr("y", newY);
+      });
     });
                 
     simulation.alpha(0.8).restart();
@@ -294,18 +300,18 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
 
   function drag(simulation: d3.Simulation<SystemGraphNode, undefined>) {
-    function dragstarted(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d: SystemGraphNode) {
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d_node: SystemGraphNode) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
+      d_node.fx = d_node.x;
+      d_node.fy = d_node.y;
     }
 
-    function dragged(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d: SystemGraphNode) {
-      d.fx = event.x;
-      d.fy = event.y;
+    function dragged(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d_node: SystemGraphNode) {
+      d_node.fx = event.x;
+      d_node.fy = event.y;
     }
 
-    function dragended(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d: SystemGraphNode) {
+    function dragended(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d_node: SystemGraphNode) {
       if (!event.active) simulation.alphaTarget(0);
     }
 
@@ -353,9 +359,10 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
         let line: string[] = [];
         let lineNumber = 0;
         const lineHeight = 1.1; 
-        // Use a default dy if textElement.attr("dy") is null, or ensure it's a number.
-        const initialDyAttr = textElement.attr("dy");
-        const dy = initialDyAttr ? parseFloat(initialDyAttr) : 0;
+        
+        const dyAttribute = textElement.attr("dy");
+        const dy = dyAttribute ? parseFloat(dyAttribute) : 0; 
+        
         textElement.text(null); 
 
         const maxLines = 2;
@@ -421,4 +428,3 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
 };
 
 export default SystemModelGraph;
-
