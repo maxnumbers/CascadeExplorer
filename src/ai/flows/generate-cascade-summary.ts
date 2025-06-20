@@ -10,7 +10,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 import { CascadeSummaryInputSchema, CascadeSummaryOutputSchema } from '@/types/cascade';
 import type { CascadeSummaryInput, CascadeSummaryOutput } from '@/types/cascade';
 
@@ -80,18 +80,18 @@ Final Qualitative States of Key System Stocks (after all phases):
 {{/if}}
 
 Your essay ("narrativeSummary") must:
-1.  **Introduction**: Start with the initial assertion. Briefly mention the inferred initial qualitative state of the system (if provided by 'initialSystemStatesSummary') to set the stage.
-2.  **Body - System Evolution Through Phases**:
-    *   Describe how the system evolves from its initial state. Narrate the progression of key impacts through Phase 1, Transition Phase, and Stabilization Phase.
-    *   **CRITICAL: Write a fluid, immersive narrative. Do NOT explicitly mention impact IDs (e.g., "impact-1-1") or directly quote impact labels verbatim in the essay. Instead, synthesize the *meaning and substance* of the impacts and their causal reasoning into the narrative. For example, instead of saying "'Improved Employee Well-being' (impact-1-1) occurred...", you might say "Initially, measures to enhance employee well-being, such as better compensation, began to take effect...".**
-    *   **Integrate State Changes**: When discussing impacts, explain how they likely affected the qualitative states of relevant system stocks (e.g., "This policy initially strengthened 'Public Trust', but later strained 'Fiscal Reserves'.").
-    *   **Weave in Feedback Loops**: Explicitly incorporate the 'feedbackLoopInsights'. Explain how these loops (reinforcing or balancing) influenced the system's trajectory and the evolution of its qualitative states. For example: "The initial success in X created a reinforcing loop by boosting Y, which in turn further accelerated X."
-    *   **Highlight Key Dynamics**: Focus on the most significant causal chains, state shifts, and feedback mechanisms. Don't just list impacts; explain their interplay.
-3.  **Conclusion - Equilibrium and System Destination**:
-    *   Based on the entire evolution, the final qualitative states (if provided), and the identified feedback loops, discuss where the system tends to stabilize.
-    *   Describe 1-3 plausible "equilibrium states" or "system destinations." These are not necessarily static endpoints but rather dynamic patterns or conditions the system is likely to settle into. For example: "The system appears to be heading towards a new equilibrium characterized by high innovation but increased social stratification," or "A likely outcome is a fragile balance, with ongoing tension between force A and force B."
+1.  **Introduction**: Start with the initial assertion. Briefly describe the initial situation or context (informed by 'initialSystemStatesSummary' if provided) to set the stage.
+2.  **Body - System Evolution Through Stages**:
+    *   Describe how the system evolves from its initial condition. Narrate the progression of key developments and consequences, drawing from the substance of Phase 1, Transition, and Stabilization impacts.
+    *   **CRITICAL: Write a fluid, immersive narrative. Do NOT explicitly mention "Phase 1/2/3", impact IDs (e.g., "impact-1-1"), or directly quote impact labels/descriptions verbatim in the essay. Instead, synthesize the *meaning, substance, and causal connections* of the impacts into the narrative. For example, instead of saying "'Improved Employee Well-being' (impact-1-1) occurred, which was a high validity impact...", you might say "Initially, efforts to enhance employee well-being, such as better compensation, began to take effect, strengthening morale...".**
+    *   **Integrate State Changes Naturally**: When discussing developments, explain how they likely affected relevant aspects of the system (informed by qualitative stock states). For example: "This policy initially bolstered public trust, but later placed a strain on fiscal reserves." Avoid saying "Stock 'Public Trust' changed to 'High'".
+    *   **Weave in Feedback Dynamics**: Subtly incorporate the essence of 'feedbackLoopInsights'. Explain how these reinforcing or balancing dynamics influenced the system's trajectory. For example: "The initial success in X created a virtuous cycle by boosting Y, which in turn further accelerated X." Avoid using the term "feedback loop" explicitly unless it flows very naturally.
+    *   **Highlight Key Dynamics**: Focus on the most significant causal chains and shifts in the system. Don't just list events; explain their interplay and significance.
+3.  **Conclusion - System Outlook and Potential Futures**:
+    *   Based on the entire evolution, the final system conditions (if provided), and the identified dynamics, discuss where the system appears to be heading.
+    *   Describe 1-3 plausible "future scenarios" or "system destinations." These are not necessarily static endpoints but rather dynamic patterns or conditions the system is likely to settle into. For example: "The system appears to be heading towards a new state characterized by high innovation but increased social stratification," or "A likely outcome is a fragile balance, with ongoing tension between certain forces."
     *   Your conclusion should synthesize the analysis into a coherent view of the system's likely future based *only* on the provided inputs.
-4.  **Tone and Style**: Authoritative, analytical, insightful, and persuasive. Make it read like a sophisticated systems analysis.
+4.  **Tone and Style**: Authoritative, analytical, insightful, and persuasive. Make it read like a sophisticated systems analysis written for a general intelligent audience, not a technical report.
 
 Crucially, ensure your narrative is grounded in the provided data (assertion, impacts, states, feedback insights). Do not introduce external information. The goal is to synthesize the provided system dynamics into a compelling story of change and potential futures.
 `,
@@ -127,3 +127,4 @@ const generateCascadeSummaryFlow = ai.defineFlow(
 );
 
     
+
