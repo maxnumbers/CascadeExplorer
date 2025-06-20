@@ -150,7 +150,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .force("collide", d3.forceCollide<SystemGraphNode>().radius(d_node => (d_node.type === 'stock' ? 60 : 40)).strength(0.9)); 
 
     const linkElements = svg.append("g")
-      .attr("class", "links")
+      .attr("class", "links") // This group will be transformed by zoom
       .attr("stroke", LINK_COLOR)
       .attr("stroke-opacity", 0.7)
       .selectAll("line")
@@ -165,7 +165,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
 
     const nodeElements = svg.append("g")
-      .attr("class", "nodes")
+      .attr("class", "nodes") // This group will be transformed by zoom
       .selectAll("g")
       .data(d3Nodes, (d_node: SystemGraphNode) => d_node.id)
       .join("g")
@@ -190,7 +190,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("stroke", d_node => d3.color(d_node.baseColor)?.darker(0.5).toString() || '#000000')
       .attr("stroke-width", 1.5);
 
-    const labelElements = nodeElements.append("text")
+    nodeElements.append("text") // Appending text directly to the node's <g>
       .attr("font-size", "10px")
       .attr("font-weight", "600") 
       .attr("fill", d_node => { 
@@ -224,13 +224,18 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
     nodeElements.append("title")
       .text(d_node => `${d_node.label}${d_node.qualitativeState ? ` (${d_node.qualitativeState})` : ''}${d_node.description ? `\nDescription: ${d_node.description}` : ''}`);
 
-    const linkLabelGroup = svg.append("g")
-      .attr("class", "link-labels");
+    // Top-level group for all link labels, this one gets transformed by zoom
+    const topLevelLinkLabelGroup = svg.append("g").attr("class", "link-labels");
 
-    const linkLabelElements = linkLabelGroup
-      .selectAll("text")
-      .data(d3Links) 
-      .join("text")
+    // Create individual <g> elements for each link label
+    const individualLabelGroups = topLevelLinkLabelGroup
+      .selectAll("g.link-label-item-group")
+      .data(d3Links, (d_link: any) => `${(d_link.source as SystemGraphNode).id || d_link.source}-${(d_link.target as SystemGraphNode).id || d_link.target}`)
+      .join("g")
+      .attr("class", "link-label-item-group");
+
+    // Append text to these individual groups
+    individualLabelGroups.append("text")
       .attr("class", "link-label")
       .attr("font-size", "9px")
       .attr("fill", LINK_LABEL_COLOR) 
@@ -245,9 +250,9 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         }
         return textToShow || "";
       })
-      .call(wrapLinkText, 70); 
+      .call(wrapLinkText, 70);
 
-    linkLabelElements.append("title")
+    individualLabelGroups.append("title")
         .text(d_link => `${d_link.type === 'incentive' ? 'Incentive' : 'Flow'}: ${d_link.label}${d_link.detailText ? `\nDetails: ${d_link.detailText}` : ''}`);
 
 
@@ -261,9 +266,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       nodeElements
         .attr("transform", d_node => `translate(${d_node.x || 0},${d_node.y || 0})`);
             
-      linkLabelElements.each(function(d_link: SystemGraphLink) {
-        const linkTextElement = d3.select(this);
-        const sourceNode = d_link.source as SystemGraphNode; // After simulation, these are node objects
+      individualLabelGroups.attr("transform", (d_link: SystemGraphLink) => {
+        const sourceNode = d_link.source as SystemGraphNode;
         const targetNode = d_link.target as SystemGraphNode;
 
         let newX = 0;
@@ -275,8 +279,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         if (sourceNode.y !== undefined && targetNode.y !== undefined) {
           newY = (sourceNode.y + targetNode.y) / 2 - 8; // Offset slightly above link
         }
-        
-        linkTextElement.attr("x", newX).attr("y", newY);
+        return `translate(${newX}, ${newY})`;
       });
     });
                 
@@ -286,6 +289,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .scaleExtent([0.15, 2.5]) 
         .on("zoom", (event) => {
             const { transform } = event;
+            // Apply zoom to the main groups: nodes, links, and the top-level link-labels group
             svg.selectAll(".nodes, .links, .link-labels").attr("transform", transform.toString());
         });
 
@@ -353,67 +357,83 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
 function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElement, unknown>, maxWidth: number) {
     texts.each(function(dLink) {
-        const textElement = d3.select(this);
+        const textElement = d3.select(this); // This is the <text> element
         const words = (dLink.displayedText || "").split(/\s+/).reverse(); 
         let word;
         let line: string[] = [];
         let lineNumber = 0;
-        const lineHeight = 1.1; 
+        const lineHeight = 1.1; // ems
         
-        const dyAttribute = textElement.attr("dy");
-        const dy = dyAttribute ? parseFloat(dyAttribute) : 0; 
-        
-        textElement.text(null); 
+        // Get the dy of the <text> element itself if it exists, otherwise default for tspans
+        // For tspans within a text element that's anchored middle, dy is usually used for line spacing
+        const initialDyValue = textElement.attr("dy"); // Check if <text> has a dy
+        let currentLineDy = initialDyValue ? initialDyValue : "0.35em"; // Adjusted default dy for first line if text has no dy
+                                                                      // 0.35em is often used to vertically center single line text
+                                                                      // If the text element has no 'dy' itself, the first tspan needs to establish a baseline.
+                                                                      // If text has `dominant-baseline: middle`, tspans might use `dy` for offsets.
+                                                                      // For text-anchor:middle, we want the tspans to stack around the y=0 of the text element.
+
+        textElement.text(null); // Clear existing text content before adding tspans
 
         const maxLines = 2;
 
         while ((word = words.pop()) && lineNumber < maxLines) {
             line.push(word);
             const tspan = textElement.append("tspan")
-                .attr("x", 0) 
-                .attr("dy", `${lineNumber === 0 ? dy : lineHeight}em`) 
+                .attr("x", 0) // Centered horizontally due to parent text's text-anchor="middle"
+                .attr("dy", lineNumber === 0 ? currentLineDy : `${lineHeight}em`) // Use adjusted dy for first line, then relative for subsequent
                 .text(line.join(" "));
             
             if ((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
                 if (line.length > 1) { 
-                    line.pop();
-                    tspan.text(line.join(" ")); 
+                    line.pop(); // remove the word that made it too long
+                    tspan.text(line.join(" ")); // re-set the tspan to the line without that word
                     if (lineNumber + 1 < maxLines) { 
                         lineNumber++;
-                        line = [word!]; 
+                        line = [word!]; // start new line with the popped word
                         textElement.append("tspan")
                             .attr("x", 0)
                             .attr("dy", `${lineHeight}em`)
                             .text(word);
-                    } else {
+                    } else { // Max lines reached, truncate current line
                         let currentText = line.join(" ");
                         while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
                             currentText = currentText.slice(0, -1);
                             tspan.text(currentText + "…");
                         }
-                        if (currentText.length === 0) tspan.text("…");
-                        words.length = 0; 
+                        if (currentText.length === 0 && tspan.node()) tspan.text("…");
+                        words.length = 0; // Stop processing more words
                         break;
                     }
-                } else { 
+                } else { // Single word is too long
                      let currentText = line.join(" ");
                      while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
                         currentText = currentText.slice(0, -1);
                         tspan.text(currentText + "…");
                      }
-                     if (currentText.length === 0) tspan.text("…");
-                     words.length = 0; 
+                     if (currentText.length === 0 && tspan.node()) tspan.text("…");
+                     words.length = 0; // Stop processing more words
                      break;
                 }
             }
         }
         
+        // If there are still words left and we've hit maxLines, ensure the last displayed line is truncated
         if (words.length > 0 && lineNumber === maxLines - 1) {
             const lastTspan = textElement.selectAll<SVGTSpanElement, unknown>("tspan").filter((_,i,nodes) => i === nodes.length -1 );
             if (lastTspan.node()) {
                  let currentText = lastTspan.text();
-                 if (!(currentText.endsWith("…"))) {
-                    lastTspan.text(currentText.substring(0, currentText.length -1) + "…");
+                 if (!(currentText.endsWith("…"))) { // Avoid double "…"
+                    // This part needs to be careful not to make it longer again
+                    // Check if adding "…" makes it exceed maxWidth. If so, shorten further.
+                    let tempText = currentText.substring(0, currentText.length -1) + "…";
+                    lastTspan.text(tempText); // Tentatively set
+                    while((lastTspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && tempText.length > 1) {
+                        tempText = tempText.substring(0, tempText.length - 2) + "…"; // Remove char before "…"
+                        lastTspan.text(tempText);
+                    }
+                    if(tempText.length <=1 && lastTspan.node()) lastTspan.text("…");
+
                  }
             }
         }
@@ -428,3 +448,4 @@ function wrapLinkText(texts: d3.Selection<d3.BaseType, SystemGraphLink, SVGGElem
 };
 
 export default SystemModelGraph;
+
