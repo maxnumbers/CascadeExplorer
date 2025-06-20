@@ -11,6 +11,7 @@ const AGENT_COLOR = 'hsl(var(--accent))';
 const LINK_COLOR = 'hsl(var(--muted-foreground))';
 const LINK_LABEL_COLOR = 'hsl(var(--foreground))';
 const BG_COLOR = 'hsl(var(--card))';
+const LABEL_VERTICAL_OFFSET = 12; // Pixels to offset parallel labels
 
 
 const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: number; height?: number; }> = ({ systemModel, width: propWidth, height: propHeight }) => {
@@ -22,7 +23,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
     if (!model) return { nodes: [], links: [] };
 
     const nodes: SystemGraphNode[] = [];
-    const links: SystemGraphLink[] = [];
+    let links: SystemGraphLink[] = []; // Changed to let for modification
     
     const getD3Id = (type: 'stock' | 'agent', name: string) => `${type}-${name.replace(/\s+/g, '_')}`;
 
@@ -69,6 +70,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
                       ? incentive.incentiveDescription 
                       : undefined, 
           type: 'incentive',
+          parallelIndex: 0, // Default
+          parallelTotal: 1, // Default
         });
       } else {
         console.warn(`SystemModelGraph: Could not find D3 node for agent '${incentive.agentName}' or stock '${incentive.targetStockName}' for incentive:`, incentive);
@@ -90,11 +93,38 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
                 displayedText: flow.flowDescription, 
                 detailText: flow.drivingForceDescription, 
                 type: 'stock-to-stock',
+                parallelIndex: 0, // Default
+                parallelTotal: 1, // Default
             });
         } else {
              console.warn(`SystemModelGraph: Could not find D3 node for source stock '${flow.sourceStockName}' or target stock '${flow.targetStockName}' for stock-to-stock flow:`, flow);
         }
     });
+
+    // Assign parallelIndex and parallelTotal
+    const linkGroups: Record<string, SystemGraphLink[]> = {};
+    links.forEach(link => {
+        const sourceId = typeof link.source === 'string' ? link.source : (link.source as SystemGraphNode).id;
+        const targetId = typeof link.target === 'string' ? link.target : (link.target as SystemGraphNode).id;
+        
+        // Normalize order for key to handle bidirectional links as part of the same group for stacking
+        const groupKey = sourceId < targetId ? `${sourceId}---${targetId}` : `${targetId}---${sourceId}`;
+
+        if (!linkGroups[groupKey]) {
+            linkGroups[groupKey] = [];
+        }
+        linkGroups[groupKey].push(link);
+    });
+
+    Object.values(linkGroups).forEach(group => {
+        if (group.length > 1) {
+            group.forEach((link, index) => {
+                link.parallelIndex = index;
+                link.parallelTotal = group.length;
+            });
+        }
+    });
+
     return { nodes, links };
   };
 
@@ -167,13 +197,10 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("marker-end", "url(#end-arrow)")
       .each(function(d_link) { 
           const marker = svg.select("#end-arrow"); 
-          // This should ideally be dynamic based on the target node of THIS d_link
-          // For simplicity, if d_link.target is a string, find it. If object, use it.
           let targetNodeForMarker: SystemGraphNode | undefined;
           if (typeof d_link.target === 'string') {
             targetNodeForMarker = d3Nodes.find(n => n.id === d_link.target);
           } else if (typeof d_link.target === 'number') {
-             // Should not happen with string IDs, but defensive
             targetNodeForMarker = d3Nodes.find(n => n.id === String(d_link.target));
           } else {
             targetNodeForMarker = d_link.target as SystemGraphNode;
@@ -250,7 +277,6 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .join(
         enter => { 
           const g = enter.append("g").attr("class", "link-label-item-group");
-
           g.append("text") 
             .attr("class", "link-label")
             .attr("font-size", "9px")
@@ -258,14 +284,13 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             .attr("text-anchor", "middle")
             .attr("paint-order", "stroke")
             .attr("stroke", BG_COLOR) 
-            .attr("stroke-width", "0.25em") 
-            .call(wrapLinkText, 200); // Increased maxWidth for diagnostics
-
+            .attr("stroke-width", "0.25em")
+            .call(wrapLinkText, 120); 
           g.append("title");
           return g;
         },
         update => { 
-            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 200); // Increased maxWidth
+            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 120);
             return update;
         },
         exit => exit.remove()
@@ -287,8 +312,9 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             
       individualLabelGroups.each(function(d_link) {
         const linkTextGroup = d3.select(this);
-        const sourceNode = d_link.source as SystemGraphNode;
-        const targetNode = d_link.target as SystemGraphNode;
+        const sourceNode = d_link.source as SystemGraphNode; // After simulation, these are node objects
+        const targetNode = d_link.target as SystemGraphNode; // After simulation, these are node objects
+        
         let newX = 0;
         let newY = 0;
 
@@ -296,7 +322,26 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             newX = (sourceNode.x + targetNode.x) / 2;
         }
         if (sourceNode.y !== undefined && targetNode.y !== undefined) {
-            newY = (sourceNode.y + targetNode.y) / 2 - 8; // Slight offset above the line
+            newY = (sourceNode.y + targetNode.y) / 2 - 8; // Base offset above the line
+        }
+
+        // Adjust Y for parallel links
+        if (d_link.parallelTotal && d_link.parallelTotal > 1 && d_link.parallelIndex !== undefined) {
+            const offsetDirection = (sourceNode.x || 0) > (targetNode.x || 0) ? 1 : -1; // To decide which side of mid-point line for vertical stack
+            const verticalStackOffset = (d_link.parallelIndex - (d_link.parallelTotal - 1) / 2) * LABEL_VERTICAL_OFFSET;
+            
+            // Calculate vector perpendicular to link for offset direction (simplified)
+            const dx = (targetNode.x || 0) - (sourceNode.x || 0);
+            const dy = (targetNode.y || 0) - (sourceNode.y || 0);
+            const length = Math.sqrt(dx*dx + dy*dy);
+            
+            if (length > 0) { // Avoid division by zero
+                 // Offset perpendicular to the link's direction
+                newX += (verticalStackOffset * dy / length) * offsetDirection; // This might spread them horizontally too
+                newY -= (verticalStackOffset * dx / length) * offsetDirection; // Main vertical offset
+            } else { // Fallback if nodes are at the same position (should not happen)
+                newY += verticalStackOffset;
+            }
         }
         linkTextGroup.attr("transform", `translate(${newX}, ${newY})`);
       });
@@ -379,65 +424,29 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGElement, unknown>, maxWidth: number) {
     texts.each(function(dLink) {
         const textElement = d3.select(this);
-        const words = (dLink.displayedText || "").split(/\s+/).reverse(); 
-        let word;
-        let line: string[] = [];
-        let lineNumber = 0;
-        const lineHeight = 1.1; 
+        textElement.text(null); // Clear existing tspans
 
-        const dyAttribute = textElement.attr("dy");
-        const initialDyValue = dyAttribute ? parseFloat(dyAttribute) : 0; 
-        let currentLineDy = isNaN(initialDyValue) ? "0.35em" : `${initialDyValue}em`;
+        const originalText = dLink.displayedText || "";
+        const maxLines = 1; // Force single line for link labels
+        letlineNumber = 0;
+        
+        // Attempt to display on one line. If too long, truncate with ellipsis.
+        const tspan = textElement.append("tspan")
+            .attr("x", 0)
+            .attr("dy", "0.35em") // Vertically center
+            .text(originalText);
 
-        textElement.text(null); 
-
-        const maxLines = 1; // Forcing single line for diagnostics
-
-        while ((word = words.pop()) && lineNumber < maxLines) {
-            line.push(word);
-            const tspan = textElement.append("tspan")
-                .attr("x", 0) 
-                .attr("dy", lineNumber === 0 ? currentLineDy : `${lineHeight}em`) 
-                .text(line.join(" "));
-            
-            if ((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
-                if (line.length > 1) { 
-                    line.pop(); 
-                    tspan.text(line.join(" ")); 
-                    // Since maxLines is 1, we immediately truncate if the first word itself is too long or if subsequent words make it too long
-                    let currentText = line.join(" ");
-                     while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
-                        currentText = currentText.slice(0, -1);
-                        tspan.text(currentText + "…");
-                     }
-                     if (currentText.length === 0 && tspan.node()) tspan.text("…");
-                     words.length = 0; // Stop processing more words
-                     break;
-                } else { // Single word is too long
-                     let currentText = line.join(" ");
-                     while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
-                        currentText = currentText.slice(0, -1);
-                        tspan.text(currentText + "…");
-                     }
-                     if (currentText.length === 0 && tspan.node()) tspan.text("…");
-                     words.length = 0; // Stop processing more words
-                     break;
-                }
+        if ((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
+            let text = originalText;
+            while (text.length > 0 && (tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
+                text = text.slice(0, -1);
+                tspan.text(text + "…");
             }
-        }
-        // If there are still words left (because maxLines was 1 and the first line fit but there was more),
-        // and the current text doesn't end with ellipsis, add ellipsis.
-        if (words.length > 0 && lineNumber === maxLines - 1) {
-            const lastTspan = textElement.selectAll<SVGTSpanElement, unknown>("tspan").filter((_,i,nodes) => i === nodes.length -1 );
-            if (lastTspan.node()) {
-                 let currentText = lastTspan.text();
-                 if (!(currentText.endsWith("…"))) { 
-                    lastTspan.text(currentText + "…");
-                 }
-            }
+            if (text.length === 0 && tspan.node()) tspan.text("…"); 
         }
     });
 }
+
 
   return (
     <div ref={containerRef} className="w-full h-full flex justify-center items-center bg-card rounded-lg shadow-inner overflow-hidden border border-input">

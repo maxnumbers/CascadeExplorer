@@ -266,13 +266,12 @@ export interface SystemGraphNode extends SimulationNodeDatum {
 }
 
 export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
-  linkId: string; // Unique ID for this specific link instance, crucial for D3 key functions.
-  // Source and target are inherited from SimulationLinkDatum<SystemGraphNode>.
-  // They will be string IDs initially, and D3's forceLink will update them
-  // to be references to the actual SystemGraphNode objects.
-  label: string;  // Primary, potentially longer descriptive label for the link (e.g., full incentiveDescription or full flowDescription)
-  displayedText: string; // The concise text to show on the graph edge, derived from AI's concise fields.
-  detailText?: string; // Optional further details for tooltip (e.g., the other part of an incentive or flow)
-  type: 'incentive' | 'stock-to-stock'; // To differentiate link types
+  linkId: string; 
+  label: string; 
+  displayedText: string; 
+  detailText?: string; 
+  type: 'incentive' | 'stock-to-stock';
+  parallelIndex?: number; // Index of this link among parallel links (0, 1, 2...)
+  parallelTotal?: number; // Total number of parallel links in its group
 }
     
