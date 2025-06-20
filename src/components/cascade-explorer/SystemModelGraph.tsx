@@ -60,7 +60,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
                          ? incentive.resultingFlow 
                          : incentive.incentiveDescription.substring(0,35) + (incentive.incentiveDescription.length > 35 ? "..." : "");
         links.push({
-          linkId: `incentive-${agentNode.id}-${stockNode.id}-${displayed.replace(/\s+/g, '_')}-${index}`,
+          linkId: `incentive-${agentNode.id}-${stockNode.id}-${displayed.replace(/\s+/g, '_').slice(0,15)}-${index}`,
           source: agentNode.id, 
           target: stockNode.id, 
           label: incentive.incentiveDescription, 
@@ -83,7 +83,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
         if (sourceNode && targetNode) {
             links.push({
-                linkId: `s2s-${sourceNode.id}-${targetNode.id}-${flow.flowDescription.replace(/\s+/g, '_')}-${index}`,
+                linkId: `s2s-${sourceNode.id}-${targetNode.id}-${flow.flowDescription.replace(/\s+/g, '_').slice(0,15)}-${index}`,
                 source: sourceNode.id, 
                 target: targetNode.id, 
                 label: flow.flowDescription, 
@@ -167,7 +167,18 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("marker-end", "url(#end-arrow)")
       .each(function(d_link) { 
           const marker = svg.select("#end-arrow"); 
-          marker.attr("refX", getRefXForMarker(d_link.target));
+          // This should ideally be dynamic based on the target node of THIS d_link
+          // For simplicity, if d_link.target is a string, find it. If object, use it.
+          let targetNodeForMarker: SystemGraphNode | undefined;
+          if (typeof d_link.target === 'string') {
+            targetNodeForMarker = d3Nodes.find(n => n.id === d_link.target);
+          } else if (typeof d_link.target === 'number') {
+             // Should not happen with string IDs, but defensive
+            targetNodeForMarker = d3Nodes.find(n => n.id === String(d_link.target));
+          } else {
+            targetNodeForMarker = d_link.target as SystemGraphNode;
+          }
+          marker.attr("refX", getRefXForMarker(targetNodeForMarker));
       });
 
 
@@ -235,9 +246,9 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     const individualLabelGroups = topLevelLinkLabelGroup
       .selectAll("g.link-label-item-group")
-      .data(d3Links, (d_link: SystemGraphLink) => d_link.linkId) // Use unique linkId as key
+      .data(d3Links, (d_link: SystemGraphLink) => d_link.linkId) 
       .join(
-        enter => {
+        enter => { 
           const g = enter.append("g").attr("class", "link-label-item-group");
 
           g.append("text") 
@@ -248,13 +259,13 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             .attr("paint-order", "stroke")
             .attr("stroke", BG_COLOR) 
             .attr("stroke-width", "0.25em") 
-            .call(wrapLinkText, 120); 
+            .call(wrapLinkText, 200); // Increased maxWidth for diagnostics
 
           g.append("title");
           return g;
         },
         update => { 
-            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 120); 
+            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 200); // Increased maxWidth
             return update;
         },
         exit => exit.remove()
@@ -274,20 +285,20 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       nodeElements
         .attr("transform", d_node => `translate(${d_node.x || 0},${d_node.y || 0})`);
             
-      individualLabelGroups.attr("transform", (d_link: SystemGraphLink) => {
-        const sourceNode = d_link.source as SystemGraphNode; 
+      individualLabelGroups.each(function(d_link) {
+        const linkTextGroup = d3.select(this);
+        const sourceNode = d_link.source as SystemGraphNode;
         const targetNode = d_link.target as SystemGraphNode;
-
         let newX = 0;
         let newY = 0;
 
         if (sourceNode.x !== undefined && targetNode.x !== undefined) {
-          newX = (sourceNode.x + targetNode.x) / 2;
+            newX = (sourceNode.x + targetNode.x) / 2;
         }
         if (sourceNode.y !== undefined && targetNode.y !== undefined) {
-          newY = (sourceNode.y + targetNode.y) / 2 - 8; 
+            newY = (sourceNode.y + targetNode.y) / 2 - 8; // Slight offset above the line
         }
-        return `translate(${newX}, ${newY})`;
+        linkTextGroup.attr("transform", `translate(${newX}, ${newY})`);
       });
     });
                 
@@ -375,12 +386,12 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
         const lineHeight = 1.1; 
 
         const dyAttribute = textElement.attr("dy");
-        const initialDy = dyAttribute ? parseFloat(dyAttribute) : 0; 
-        let currentLineDy = isNaN(initialDy) ? "0.35em" : `${initialDy}em`;
+        const initialDyValue = dyAttribute ? parseFloat(dyAttribute) : 0; 
+        let currentLineDy = isNaN(initialDyValue) ? "0.35em" : `${initialDyValue}em`;
 
         textElement.text(null); 
 
-        const maxLines = 2;
+        const maxLines = 1; // Forcing single line for diagnostics
 
         while ((word = words.pop()) && lineNumber < maxLines) {
             line.push(word);
@@ -393,48 +404,35 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
                 if (line.length > 1) { 
                     line.pop(); 
                     tspan.text(line.join(" ")); 
-                    if (lineNumber + 1 < maxLines) { 
-                        lineNumber++;
-                        line = [word!]; 
-                        textElement.append("tspan")
-                            .attr("x", 0)
-                            .attr("dy", `${lineHeight}em`)
-                            .text(word);
-                    } else { 
-                        let currentText = line.join(" ");
-                        while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
-                            currentText = currentText.slice(0, -1);
-                            tspan.text(currentText + "…");
-                        }
-                        if (currentText.length === 0 && tspan.node()) tspan.text("…");
-                        words.length = 0; 
-                        break;
-                    }
-                } else { 
+                    // Since maxLines is 1, we immediately truncate if the first word itself is too long or if subsequent words make it too long
+                    let currentText = line.join(" ");
+                     while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
+                        currentText = currentText.slice(0, -1);
+                        tspan.text(currentText + "…");
+                     }
+                     if (currentText.length === 0 && tspan.node()) tspan.text("…");
+                     words.length = 0; // Stop processing more words
+                     break;
+                } else { // Single word is too long
                      let currentText = line.join(" ");
                      while((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && currentText.length > 0) {
                         currentText = currentText.slice(0, -1);
                         tspan.text(currentText + "…");
                      }
                      if (currentText.length === 0 && tspan.node()) tspan.text("…");
-                     words.length = 0; 
+                     words.length = 0; // Stop processing more words
                      break;
                 }
             }
         }
-        
+        // If there are still words left (because maxLines was 1 and the first line fit but there was more),
+        // and the current text doesn't end with ellipsis, add ellipsis.
         if (words.length > 0 && lineNumber === maxLines - 1) {
             const lastTspan = textElement.selectAll<SVGTSpanElement, unknown>("tspan").filter((_,i,nodes) => i === nodes.length -1 );
             if (lastTspan.node()) {
                  let currentText = lastTspan.text();
                  if (!(currentText.endsWith("…"))) { 
-                    let tempText = currentText.substring(0, Math.max(0, currentText.length -1)) + "…";
-                    lastTspan.text(tempText); 
-                    while((lastTspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth && tempText.length > 1) {
-                        tempText = tempText.substring(0, tempText.length - 2) + "…"; 
-                        lastTspan.text(tempText);
-                    }
-                    if(tempText.length <=1 && lastTspan.node()) lastTspan.text("…");
+                    lastTspan.text(currentText + "…");
                  }
             }
         }
@@ -449,3 +447,4 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
 };
 
 export default SystemModelGraph;
+
