@@ -60,8 +60,13 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
           source: agentNode.id, 
           target: stockNode.id, 
           label: incentive.incentiveDescription, 
-          displayedText: incentive.resultingFlow || incentive.incentiveDescription.substring(0,20) + (incentive.incentiveDescription.length > 20 ? "..." : ""), 
-          detailText: incentive.resultingFlow && incentive.resultingFlow !== incentive.incentiveDescription ? incentive.resultingFlow : undefined,
+          // Prioritize resultingFlow if available and not empty, otherwise use truncated incentiveDescription
+          displayedText: (incentive.resultingFlow && incentive.resultingFlow.trim() !== '') 
+                         ? incentive.resultingFlow 
+                         : incentive.incentiveDescription.substring(0,25) + (incentive.incentiveDescription.length > 25 ? "..." : ""),
+          detailText: (incentive.resultingFlow && incentive.resultingFlow.trim() !== '' && incentive.incentiveDescription !== incentive.resultingFlow) 
+                      ? incentive.incentiveDescription // If resultingFlow is primary, full incentiveDesc is detail
+                      : undefined, // No separate detail if resultingFlow is not primary or same as incentiveDesc
           type: 'incentive',
         });
       } else {
@@ -79,9 +84,9 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             links.push({
                 source: sourceNode.id, 
                 target: targetNode.id, 
-                label: flow.flowDescription, 
-                displayedText: flow.flowDescription, 
-                detailText: flow.drivingForceDescription,
+                label: flow.flowDescription,  // Main label for tooltip
+                displayedText: flow.flowDescription, // Text for graph edge
+                detailText: flow.drivingForceDescription, // Additional detail for tooltip
                 type: 'stock-to-stock',
             });
         } else {
@@ -233,26 +238,27 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         enter => {
           const g = enter.append("g").attr("class", "link-label-item-group");
 
-          g.append("text") // Append text only on enter
+          g.append("text") 
             .attr("class", "link-label")
             .attr("font-size", "9px")
             .attr("fill", LINK_LABEL_COLOR)
             .attr("text-anchor", "middle")
             .attr("paint-order", "stroke")
             .attr("stroke", BG_COLOR)
-            .attr("stroke-width", "0.25em");
+            .attr("stroke-width", "0.25em")
+            .call(wrapLinkText, 120); // Use increased maxWidth
 
-          g.append("title"); // Append title only on enter
+          g.append("title");
           return g;
         },
-        update => update, 
+        update => { 
+            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 120); // Use increased maxWidth
+            return update;
+        },
         exit => exit.remove()
       );
     
-    individualLabelGroups.select<SVGTextElement>("text.link-label") // Use select<SVGTextElement> for type safety
-        .call(wrapLinkText, 70);
-
-    individualLabelGroups.select<SVGTitleElement>("title") // Use select<SVGTitleElement> for type safety
+    individualLabelGroups.select<SVGTitleElement>("title") 
         .text(d_link => `${d_link.type === 'incentive' ? 'Incentive' : 'Flow'}: ${d_link.label}${d_link.detailText ? `\nDetails: ${d_link.detailText}` : ''}`);
 
 
@@ -267,7 +273,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .attr("transform", d_node => `translate(${d_node.x || 0},${d_node.y || 0})`);
             
       individualLabelGroups.attr("transform", (d_link: SystemGraphLink) => {
-        const sourceNode = d_link.source as SystemGraphNode; // After simulation, source/target are node objects
+        const sourceNode = d_link.source as SystemGraphNode; 
         const targetNode = d_link.target as SystemGraphNode;
 
         let newX = 0;
@@ -363,9 +369,10 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
         let lineNumber = 0;
         const lineHeight = 1.1; 
 
-        const dyAttr = textElement.attr("dy");
-        const parsedInitialDy = dyAttr ? parseFloat(dyAttr) : NaN;
-        let currentLineDy = !isNaN(parsedInitialDy) ? `${parsedInitialDy}em` : "0.35em"; 
+        const dyAttribute = textElement.attr("dy");
+        // Use a default of 0 if dyAttribute is null, or if parseFloat results in NaN
+        const initialDy = dyAttribute ? parseFloat(dyAttribute) : 0; 
+        let currentLineDy = isNaN(initialDy) ? "0.35em" : `${initialDy}em`;
 
         textElement.text(null); 
 
@@ -438,3 +445,4 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
 };
 
 export default SystemModelGraph;
+
