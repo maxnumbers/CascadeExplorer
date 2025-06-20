@@ -49,24 +49,25 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
        });
     });
 
-    (model.incentives || []).forEach(incentive => {
+    (model.incentives || []).forEach((incentive, index) => {
       const agentNodeId = getD3Id('agent', incentive.agentName);
       const stockNodeId = getD3Id('stock', incentive.targetStockName);
       const agentNode = nodes.find(n => n.id === agentNodeId);
       const stockNode = nodes.find(n => n.id === stockNodeId);
 
       if (agentNode && stockNode) {
+        const displayed = (incentive.resultingFlow && incentive.resultingFlow.trim() !== '') 
+                         ? incentive.resultingFlow 
+                         : incentive.incentiveDescription.substring(0,35) + (incentive.incentiveDescription.length > 35 ? "..." : "");
         links.push({
+          linkId: `incentive-${agentNode.id}-${stockNode.id}-${displayed.replace(/\s+/g, '_')}-${index}`,
           source: agentNode.id, 
           target: stockNode.id, 
           label: incentive.incentiveDescription, 
-          // Prioritize resultingFlow if available and not empty, otherwise use truncated incentiveDescription
-          displayedText: (incentive.resultingFlow && incentive.resultingFlow.trim() !== '') 
-                         ? incentive.resultingFlow 
-                         : incentive.incentiveDescription.substring(0,25) + (incentive.incentiveDescription.length > 25 ? "..." : ""),
+          displayedText: displayed,
           detailText: (incentive.resultingFlow && incentive.resultingFlow.trim() !== '' && incentive.incentiveDescription !== incentive.resultingFlow) 
-                      ? incentive.incentiveDescription // If resultingFlow is primary, full incentiveDesc is detail
-                      : undefined, // No separate detail if resultingFlow is not primary or same as incentiveDesc
+                      ? incentive.incentiveDescription 
+                      : undefined, 
           type: 'incentive',
         });
       } else {
@@ -74,7 +75,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       }
     });
 
-    (model.stockToStockFlows || []).forEach(flow => {
+    (model.stockToStockFlows || []).forEach((flow, index) => {
         const sourceNodeId = getD3Id('stock', flow.sourceStockName);
         const targetNodeId = getD3Id('stock', flow.targetStockName);
         const sourceNode = nodes.find(n => n.id === sourceNodeId);
@@ -82,11 +83,12 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
         if (sourceNode && targetNode) {
             links.push({
+                linkId: `s2s-${sourceNode.id}-${targetNode.id}-${flow.flowDescription.replace(/\s+/g, '_')}-${index}`,
                 source: sourceNode.id, 
                 target: targetNode.id, 
-                label: flow.flowDescription,  // Main label for tooltip
-                displayedText: flow.flowDescription, // Text for graph edge
-                detailText: flow.drivingForceDescription, // Additional detail for tooltip
+                label: flow.flowDescription, 
+                displayedText: flow.flowDescription, 
+                detailText: flow.drivingForceDescription, 
                 type: 'stock-to-stock',
             });
         } else {
@@ -136,8 +138,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
         .attr("d", "M0,-5L10,0L0,5")
         .attr("fill", LINK_COLOR);
     
-    const getRefXForMarker = (targetNode: SystemGraphNode | string | number | d3.SimulationNodeDatum | undefined) => {
-        const node = typeof targetNode === 'string' || typeof targetNode === 'number' ? d3Nodes.find(n => n.id === targetNode) : targetNode as SystemGraphNode;
+    const getRefXForMarker = (targetNodeDatum: SystemGraphNode | string | number | d3.SimulationNodeDatum | undefined) => {
+        const node = typeof targetNodeDatum === 'string' || typeof targetNodeDatum === 'number' ? d3Nodes.find(n => n.id === targetNodeDatum) : targetNodeDatum as SystemGraphNode;
         if (node?.type === 'stock') return 47; 
         if (node?.type === 'agent') return 30; 
         return 15; 
@@ -159,7 +161,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
       .attr("stroke", LINK_COLOR)
       .attr("stroke-opacity", 0.7)
       .selectAll("line")
-      .data(d3Links, (d_link: any) => `${(d_link.source as SystemGraphNode).id || d_link.source}-${(d_link.target as SystemGraphNode).id || d_link.target}`)
+      .data(d3Links, (d_link: SystemGraphLink) => d_link.linkId)
       .join("line")
       .attr("stroke-width", 1.5)
       .attr("marker-end", "url(#end-arrow)")
@@ -233,7 +235,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     const individualLabelGroups = topLevelLinkLabelGroup
       .selectAll("g.link-label-item-group")
-      .data(d3Links, (d_link: any) => `${(d_link.source as SystemGraphNode).id || d_link.source}-${(d_link.target as SystemGraphNode).id || d_link.target}`)
+      .data(d3Links, (d_link: SystemGraphLink) => d_link.linkId) // Use unique linkId as key
       .join(
         enter => {
           const g = enter.append("g").attr("class", "link-label-item-group");
@@ -244,15 +246,15 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             .attr("fill", LINK_LABEL_COLOR)
             .attr("text-anchor", "middle")
             .attr("paint-order", "stroke")
-            .attr("stroke", BG_COLOR)
-            .attr("stroke-width", "0.25em")
-            .call(wrapLinkText, 120); // Use increased maxWidth
+            .attr("stroke", BG_COLOR) 
+            .attr("stroke-width", "0.25em") 
+            .call(wrapLinkText, 120); 
 
           g.append("title");
           return g;
         },
         update => { 
-            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 120); // Use increased maxWidth
+            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 120); 
             return update;
         },
         exit => exit.remove()
@@ -322,6 +324,9 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     function dragended(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d_node: SystemGraphNode) {
       if (!event.active) simulation.alphaTarget(0);
+      // To unpin after drag, you could set:
+      // d_node.fx = null;
+      // d_node.fy = null;
     }
 
     return d3.drag<SVGGElement, SystemGraphNode>()
@@ -370,7 +375,6 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
         const lineHeight = 1.1; 
 
         const dyAttribute = textElement.attr("dy");
-        // Use a default of 0 if dyAttribute is null, or if parseFloat results in NaN
         const initialDy = dyAttribute ? parseFloat(dyAttribute) : 0; 
         let currentLineDy = isNaN(initialDy) ? "0.35em" : `${initialDy}em`;
 
@@ -445,4 +449,3 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
 };
 
 export default SystemModelGraph;
-

@@ -208,8 +208,8 @@ export interface ImpactNode extends Impact, SimulationNodeDatum {
 }
 
 export interface ImpactLink extends SimulationLinkDatum<ImpactNode> {
-  source: string | ImpactNode;
-  target: string | ImpactNode;
+  // source and target are inherited and will be string IDs initially,
+  // then resolved to ImpactNode objects by D3.
 }
 
 export const NODE_COLORS: Record<number, string> = {
@@ -266,6 +266,7 @@ export interface SystemGraphNode extends SimulationNodeDatum {
 }
 
 export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
+  linkId: string; // Unique ID for this specific link instance, crucial for D3 key functions.
   // Source and target are inherited from SimulationLinkDatum<SystemGraphNode>.
   // They will be string IDs initially, and D3's forceLink will update them
   // to be references to the actual SystemGraphNode objects.
@@ -274,5 +275,4 @@ export interface SystemGraphLink extends SimulationLinkDatum<SystemGraphNode> {
   detailText?: string; // Optional further details for tooltip (e.g., the other part of an incentive or flow)
   type: 'incentive' | 'stock-to-stock'; // To differentiate link types
 }
-
     
