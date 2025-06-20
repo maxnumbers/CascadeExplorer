@@ -285,12 +285,12 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             .attr("paint-order", "stroke")
             .attr("stroke", BG_COLOR) 
             .attr("stroke-width", "0.25em")
-            .call(wrapLinkText, 120); 
+            .call(wrapLinkText, 200); // Increased maxWidth for diagnostic
           g.append("title");
           return g;
         },
         update => { 
-            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 120);
+            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 200); // Increased maxWidth for diagnostic
             return update;
         },
         exit => exit.remove()
@@ -312,35 +312,31 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             
       individualLabelGroups.each(function(d_link) {
         const linkTextGroup = d3.select(this);
-        const sourceNode = d_link.source as SystemGraphNode; // After simulation, these are node objects
-        const targetNode = d_link.target as SystemGraphNode; // After simulation, these are node objects
+        const sourceNode = d_link.source as SystemGraphNode; 
+        const targetNode = d_link.target as SystemGraphNode; 
         
         let newX = 0;
         let newY = 0;
 
-        if (sourceNode.x !== undefined && targetNode.x !== undefined) {
+        if (sourceNode.x !== undefined && targetNode.x !== undefined && sourceNode.y !== undefined && targetNode.y !== undefined) {
             newX = (sourceNode.x + targetNode.x) / 2;
-        }
-        if (sourceNode.y !== undefined && targetNode.y !== undefined) {
             newY = (sourceNode.y + targetNode.y) / 2 - 8; // Base offset above the line
-        }
-
-        // Adjust Y for parallel links
-        if (d_link.parallelTotal && d_link.parallelTotal > 1 && d_link.parallelIndex !== undefined) {
-            const offsetDirection = (sourceNode.x || 0) > (targetNode.x || 0) ? 1 : -1; // To decide which side of mid-point line for vertical stack
-            const verticalStackOffset = (d_link.parallelIndex - (d_link.parallelTotal - 1) / 2) * LABEL_VERTICAL_OFFSET;
-            
-            // Calculate vector perpendicular to link for offset direction (simplified)
-            const dx = (targetNode.x || 0) - (sourceNode.x || 0);
-            const dy = (targetNode.y || 0) - (sourceNode.y || 0);
-            const length = Math.sqrt(dx*dx + dy*dy);
-            
-            if (length > 0) { // Avoid division by zero
-                 // Offset perpendicular to the link's direction
-                newX += (verticalStackOffset * dy / length) * offsetDirection; // This might spread them horizontally too
-                newY -= (verticalStackOffset * dx / length) * offsetDirection; // Main vertical offset
-            } else { // Fallback if nodes are at the same position (should not happen)
-                newY += verticalStackOffset;
+        
+            // Adjust Y for parallel links
+            if (d_link.parallelTotal && d_link.parallelTotal > 1 && d_link.parallelIndex !== undefined) {
+                const offsetDirection = (sourceNode.x || 0) > (targetNode.x || 0) ? 1 : -1; 
+                const verticalStackOffset = (d_link.parallelIndex - (d_link.parallelTotal - 1) / 2) * LABEL_VERTICAL_OFFSET;
+                
+                const dx = (targetNode.x || 0) - (sourceNode.x || 0);
+                const dy = (targetNode.y || 0) - (sourceNode.y || 0);
+                const length = Math.sqrt(dx*dx + dy*dy);
+                
+                if (length > 0) { 
+                    newX += (verticalStackOffset * dy / length) * offsetDirection; 
+                    newY -= (verticalStackOffset * dx / length) * offsetDirection; 
+                } else { 
+                    newY += verticalStackOffset;
+                }
             }
         }
         linkTextGroup.attr("transform", `translate(${newX}, ${newY})`);
@@ -424,16 +420,16 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGElement, unknown>, maxWidth: number) {
     texts.each(function(dLink) {
         const textElement = d3.select(this);
-        textElement.text(null); // Clear existing tspans
+        textElement.text(null); 
 
         const originalText = dLink.displayedText || "";
         const maxLines = 1; // Force single line for link labels
-        letlineNumber = 0;
+        let lineNumber = 0; // Corrected typo here
         
         // Attempt to display on one line. If too long, truncate with ellipsis.
         const tspan = textElement.append("tspan")
             .attr("x", 0)
-            .attr("dy", "0.35em") // Vertically center
+            .attr("dy", "0.35em") 
             .text(originalText);
 
         if ((tspan.node() as SVGTextContentElement).getComputedTextLength() > maxWidth) {
@@ -456,4 +452,3 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
 };
 
 export default SystemModelGraph;
-
