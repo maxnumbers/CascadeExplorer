@@ -76,17 +76,17 @@ Incorporate these tensions into your reasoning. How might they shape the consequ
 We are generating consequences for:
 {{#if isPhase1}}**Phase 1: Initial Consequences** (Direct effects of the assertion given initial states and tensions).
   Parent context: The main assertion "{{assertionText}}".
-  Number of distinct consequences to generate: 3-5.
+  Number of distinct consequences to generate: 3 or more.
 {{/if}}
 {{#if isPhase2}}**Phase 2: Transition Phase Consequences** (Effects stemming from Initial Consequences, considering evolving system states and tensions).
   Parent Impacts from Phase 1 (these are the direct influences for this phase's consequences):
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
-  Number of distinct consequences to generate: 2-3 overall for this phase, potentially linking to one or more of the provided parent impacts.
+  Number of distinct consequences to generate: 2 or more for this phase, potentially linking to one or more of the provided parent impacts.
 {{/if}}
 {{#if isPhase3}}**Phase 3: Stabilization Phase Consequences** (Longer-term shifts and emergent system behaviors as it moves towards new equilibriums).
   Parent Impacts from Phase 2 (these are the direct influences for this phase's consequences):
   {{#each parentImpacts}} - ID {{id}}, Label: "{{label}}" {{/each}}
-  Number of distinct consequences to generate: 1-2 overall for this phase, potentially linking to one or more of the provided parent impacts.
+  Number of distinct consequences to generate: 1 or more for this phase, potentially linking to one or more of the provided parent impacts.
 {{/if}}
 
 For each consequence you generate (to be included in the 'generatedImpacts' array):

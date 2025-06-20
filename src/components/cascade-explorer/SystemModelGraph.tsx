@@ -11,7 +11,7 @@ const AGENT_COLOR = 'hsl(var(--accent))';
 const LINK_COLOR = 'hsl(var(--muted-foreground))';
 const LINK_LABEL_COLOR = 'hsl(var(--foreground))';
 const BG_COLOR = 'hsl(var(--card))';
-const LABEL_VERTICAL_OFFSET = 12; // Pixels to offset parallel labels
+const LABEL_VERTICAL_OFFSET = 14; // Increased spacing for parallel labels
 
 
 const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: number; height?: number; }> = ({ systemModel, width: propWidth, height: propHeight }) => {
@@ -23,7 +23,7 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
     if (!model) return { nodes: [], links: [] };
 
     const nodes: SystemGraphNode[] = [];
-    let links: SystemGraphLink[] = []; // Changed to let for modification
+    const links: SystemGraphLink[] = [];
     
     const getD3Id = (type: 'stock' | 'agent', name: string) => `${type}-${name.replace(/\s+/g, '_')}`;
 
@@ -70,8 +70,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
                       ? incentive.incentiveDescription 
                       : undefined, 
           type: 'incentive',
-          parallelIndex: 0, // Default
-          parallelTotal: 1, // Default
+          parallelIndex: 0, // Default, will be updated
+          parallelTotal: 1, // Default, will be updated
         });
       } else {
         console.warn(`SystemModelGraph: Could not find D3 node for agent '${incentive.agentName}' or stock '${incentive.targetStockName}' for incentive:`, incentive);
@@ -93,8 +93,8 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
                 displayedText: flow.flowDescription, 
                 detailText: flow.drivingForceDescription, 
                 type: 'stock-to-stock',
-                parallelIndex: 0, // Default
-                parallelTotal: 1, // Default
+                parallelIndex: 0, // Default, will be updated
+                parallelTotal: 1, // Default, will be updated
             });
         } else {
              console.warn(`SystemModelGraph: Could not find D3 node for source stock '${flow.sourceStockName}' or target stock '${flow.targetStockName}' for stock-to-stock flow:`, flow);
@@ -121,6 +121,12 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             group.forEach((link, index) => {
                 link.parallelIndex = index;
                 link.parallelTotal = group.length;
+            });
+        } else {
+            // For single links, explicitly set these so the condition in tick function is clean
+            group.forEach(link => {
+              link.parallelIndex = 0;
+              link.parallelTotal = 1;
             });
         }
     });
@@ -285,12 +291,12 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
             .attr("paint-order", "stroke")
             .attr("stroke", BG_COLOR) 
             .attr("stroke-width", "0.25em")
-            .call(wrapLinkText, 200); // Increased maxWidth for diagnostic
+            .call(wrapLinkText, 200);
           g.append("title");
           return g;
         },
         update => { 
-            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 200); // Increased maxWidth for diagnostic
+            update.select<SVGTextElement>("text.link-label").call(wrapLinkText, 200);
             return update;
         },
         exit => exit.remove()
@@ -320,23 +326,12 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
         if (sourceNode.x !== undefined && targetNode.x !== undefined && sourceNode.y !== undefined && targetNode.y !== undefined) {
             newX = (sourceNode.x + targetNode.x) / 2;
-            newY = (sourceNode.y + targetNode.y) / 2 - 8; // Base offset above the line
+            newY = (sourceNode.y + targetNode.y) / 2 - 8; // Base offset for the first label or single label
         
-            // Adjust Y for parallel links
+            // Apply simplified vertical offset for parallel links
             if (d_link.parallelTotal && d_link.parallelTotal > 1 && d_link.parallelIndex !== undefined) {
-                const offsetDirection = (sourceNode.x || 0) > (targetNode.x || 0) ? 1 : -1; 
                 const verticalStackOffset = (d_link.parallelIndex - (d_link.parallelTotal - 1) / 2) * LABEL_VERTICAL_OFFSET;
-                
-                const dx = (targetNode.x || 0) - (sourceNode.x || 0);
-                const dy = (targetNode.y || 0) - (sourceNode.y || 0);
-                const length = Math.sqrt(dx*dx + dy*dy);
-                
-                if (length > 0) { 
-                    newX += (verticalStackOffset * dy / length) * offsetDirection; 
-                    newY -= (verticalStackOffset * dx / length) * offsetDirection; 
-                } else { 
-                    newY += verticalStackOffset;
-                }
+                newY += verticalStackOffset; 
             }
         }
         linkTextGroup.attr("transform", `translate(${newX}, ${newY})`);
@@ -376,9 +371,6 @@ const SystemModelGraph: React.FC<{ systemModel: SystemModel | null; width?: numb
 
     function dragended(event: d3.D3DragEvent<SVGGElement, SystemGraphNode, SystemGraphNode>, d_node: SystemGraphNode) {
       if (!event.active) simulation.alphaTarget(0);
-      // To unpin after drag, you could set:
-      // d_node.fx = null;
-      // d_node.fy = null;
     }
 
     return d3.drag<SVGGElement, SystemGraphNode>()
@@ -424,9 +416,8 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
 
         const originalText = dLink.displayedText || "";
         const maxLines = 1; // Force single line for link labels
-        let lineNumber = 0; // Corrected typo here
+        let lineNumber = 0; 
         
-        // Attempt to display on one line. If too long, truncate with ellipsis.
         const tspan = textElement.append("tspan")
             .attr("x", 0)
             .attr("dy", "0.35em") 
@@ -452,3 +443,4 @@ function wrapLinkText(texts: d3.Selection<SVGTextElement, SystemGraphLink, SVGGE
 };
 
 export default SystemModelGraph;
+
