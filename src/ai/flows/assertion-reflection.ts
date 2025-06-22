@@ -55,14 +55,18 @@ Based on this assertion, you must:
 1.  **Summary ('summary')**: Create a very concise summary of the assertion, ideally 5-10 words, suitable as a short title for the core idea.
 2.  **Reflection ('reflection')**: Provide a more detailed reflection of the assertion in 1-2 clear sentences, capturing its main thrust.
 3.  **System Model ('systemModel')**: Analyze the assertion to identify components of an interconnected system model. This model must illustrate how the assertion's core idea would impact various elements and how these elements relate to each other.
-    *   **Stocks**: Identify the key 'stocks'. Stocks are important accumulations or resources that can change over time (e.g., 'Public Trust in AI', 'Market Share of EV Cars', 'Available Water Supply', 'Technical Debt', 'Employee Well-being', 'Company Productivity'). Identify a comprehensive set that covers the core dynamics. For each stock, provide:
-        *   'name': A concise name for the stock.
-        *   'description' (optional): A brief explanation of what this stock represents.
+    *   **Stocks**: Identify the key 'stocks'. Stocks are important accumulations or resources that can change over time.
+        *   **CRITICAL CONCEPT**: Stocks can be tangible (e.g., 'Available Water Supply'), intangible (e.g., 'Public Trust in AI', 'Technical Debt'), OR **populations of actors** whose numbers or prevalence can change (e.g., **"Pool of Skilled Technicians"**, **"Base of Loyal Customers"**, **"Number of Active Protesters"**). Modeling dynamic populations as stocks is crucial for a realistic simulation.
+        *   For each stock, provide:
+            *   'name': A concise name for the stock.
+            *   'description' (optional): A brief explanation of what this stock represents.
         *   **Connectivity Requirement**: Every stock MUST be demonstrably part of the system's causal web related to the assertion. It must have clear incoming influences (e.g., targeted by an agent's incentive, affected by another stock via a stock-to-stock flow) AND outgoing influences (e.g., it is the source of a stock-to-stock flow influencing another key stock, or its state is a precondition for an agent's action described in an incentive). Do not list stocks that are merely mentioned if they don't participate in the system's dynamics as triggered by the assertion.
-    *   **Agents**: Identify the key 'agents'. Agents are actors, entities, or forces that can influence the stocks (e.g., 'Government Regulators', 'Consumers', 'Technology Developers', 'Climate Change', 'Competitors', 'Management', 'Employees'). Identify a comprehensive set. For each agent, provide:
-        *   'name': A concise name for the agent.
-        *   'description' (optional): A brief explanation of this agent's role or nature.
-            When identifying agents, consider those central to the assertion and any implied counter-agents. Ensure each agent is linked to the system through at least one incentive.
+    *   **Agents**: Identify the key 'agents'. Agents are actors, entities, or forces that can influence the stocks.
+        *   **CRITICAL CONCEPT**: Reserve the 'agent' classification for more **monolithic or singular entities** whose existence is not typically in flux, such as **'The Government'**, **'A Competitor Company'**, or **'A Specific Regulatory Body'**. Dynamic groups of individuals (like customers, employees, voters) should be modeled as 'stocks' (see above).
+        *   For each agent, provide:
+            *   'name': A concise name for the agent.
+            *   'description' (optional): A brief explanation of this agent's role or nature.
+        *   Ensure each agent is linked to the system through at least one incentive.
     *   **Incentives & Flows (Agent-Stock Interactions)**: Identify a comprehensive set of *significant* incentives. For EACH incentive, ensure the 'targetStockName' is a stock that is clearly affected by the assertion's core mechanisms or is a key mediating factor. The agent's 'resultingFlow' should show how it impacts this stock. Provide:
         *   'agentName': The name of an identified agent.
         *   'targetStockName': The name of an identified stock.
@@ -78,7 +82,6 @@ Based on this assertion, you must:
 5.  **Confirmation Question ('confirmationQuestion')**: Ask a concise question to confirm understanding.
 
 **Final System Model Review (Self-Correction Step for AI):**
-Before finalizing the 'systemModel' output:
 - Is every stock part of a clear causal chain related to the assertion? Does it have both incoming and outgoing influences within the model (via agent incentives or stock-to-stock flows)?
 - Is every agent linked to the system via at least one incentive involving a core stock?
 - Do the stock-to-stock flows create a robustly interconnected network, explaining how changes in one area ripple to others, rather than leaving some stocks as endpoints?
