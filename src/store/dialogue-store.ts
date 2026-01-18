@@ -8,7 +8,6 @@
  */
 
 import { create } from 'zustand';
-import { v4 as uuidv4 } from 'crypto';
 
 export type ConversationPhase =
   | 'welcome'       // Initial state, showing welcome message
