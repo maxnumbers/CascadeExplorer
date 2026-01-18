@@ -2,8 +2,9 @@
  * @fileOverview Settings Store
  *
  * Manages user preferences including:
- * - AI provider and model selection
+ * - AI provider and model selection (multi-provider support)
  * - API key storage
+ * - Custom endpoint configuration
  * - UI preferences
  * - Adaptation preferences
  */
@@ -19,6 +20,10 @@ interface SettingsState {
   modelId: string;
   apiKey: string;
   isConfigured: boolean;
+
+  // Custom endpoint configuration (for 'custom' provider or overrides)
+  customBaseUrl: string;
+  customModelId: string;
 
   // UI Preferences
   theme: 'dark' | 'light' | 'system';
@@ -36,6 +41,8 @@ interface SettingsState {
   setProvider: (provider: ModelProvider) => void;
   setModelId: (modelId: string) => void;
   setApiKey: (apiKey: string) => void;
+  setCustomBaseUrl: (url: string) => void;
+  setCustomModelId: (modelId: string) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setShowAdaptationPanel: (show: boolean) => void;
   setConversationPanelWidth: (width: number) => void;
@@ -56,6 +63,9 @@ export const useSettingsStore = create<SettingsState>()(
       modelId: getDefaultModel('anthropic'),
       apiKey: '',
       isConfigured: false,
+
+      customBaseUrl: '',
+      customModelId: '',
 
       theme: 'dark',
       showAdaptationPanel: true,
@@ -84,6 +94,14 @@ export const useSettingsStore = create<SettingsState>()(
         set({ apiKey, isConfigured: false, _aiClient: null });
       },
 
+      setCustomBaseUrl: (url) => {
+        set({ customBaseUrl: url, isConfigured: false, _aiClient: null });
+      },
+
+      setCustomModelId: (modelId) => {
+        set({ customModelId: modelId, isConfigured: false, _aiClient: null });
+      },
+
       // UI preference actions
       setTheme: (theme) => set({ theme }),
       setShowAdaptationPanel: (show) => set({ showAdaptationPanel: show }),
@@ -105,6 +123,8 @@ export const useSettingsStore = create<SettingsState>()(
             provider: state.provider,
             modelId: state.modelId,
             apiKey: state.apiKey,
+            customBaseUrl: state.customBaseUrl || undefined,
+            customModelId: state.customModelId || undefined,
           });
           set({ _aiClient: client });
           return client;
@@ -116,8 +136,17 @@ export const useSettingsStore = create<SettingsState>()(
       validateAndConnect: async () => {
         const state = get();
 
-        // Validate API key format
-        if (!validateApiKey(state.provider, state.apiKey)) {
+        // For custom provider, check that base URL is provided
+        if (state.provider === 'custom' && !state.customBaseUrl) {
+          return {
+            success: false,
+            error: 'Please provide a custom endpoint URL.',
+          };
+        }
+
+        // Validate API key format (some providers don't require it)
+        const providerConfig = MODEL_PROVIDERS[state.provider];
+        if (providerConfig.requiresApiKey && !validateApiKey(state.provider, state.apiKey)) {
           return {
             success: false,
             error: 'Invalid API key format. Please check your API key.',
@@ -129,6 +158,8 @@ export const useSettingsStore = create<SettingsState>()(
             provider: state.provider,
             modelId: state.modelId,
             apiKey: state.apiKey,
+            customBaseUrl: state.customBaseUrl || undefined,
+            customModelId: state.customModelId || undefined,
           });
 
           const isConnected = await client.testConnection();
@@ -139,7 +170,7 @@ export const useSettingsStore = create<SettingsState>()(
           } else {
             return {
               success: false,
-              error: 'Could not connect to the AI service. Please verify your API key.',
+              error: 'Could not connect to the AI service. Please verify your configuration.',
             };
           }
         } catch (error) {
@@ -153,6 +184,8 @@ export const useSettingsStore = create<SettingsState>()(
       clearConfiguration: () => {
         set({
           apiKey: '',
+          customBaseUrl: '',
+          customModelId: '',
           isConfigured: false,
           _aiClient: null,
         });
@@ -166,6 +199,8 @@ export const useSettingsStore = create<SettingsState>()(
         modelId: state.modelId,
         apiKey: state.apiKey,
         isConfigured: state.isConfigured,
+        customBaseUrl: state.customBaseUrl,
+        customModelId: state.customModelId,
         theme: state.theme,
         showAdaptationPanel: state.showAdaptationPanel,
         conversationPanelWidth: state.conversationPanelWidth,
@@ -182,5 +217,8 @@ export const useIsConfigured = () => useSettingsStore((state) => state.isConfigu
 export const useSelectedModel = () =>
   useSettingsStore((state) => {
     const providerConfig = MODEL_PROVIDERS[state.provider];
-    return providerConfig.models.find((m) => m.id === state.modelId) ?? providerConfig.models[0];
+    const models = providerConfig.models;
+    return models.find((m) => m.id === state.modelId) ?? models[0];
   });
+export const useProviderConfig = () =>
+  useSettingsStore((state) => MODEL_PROVIDERS[state.provider]);
