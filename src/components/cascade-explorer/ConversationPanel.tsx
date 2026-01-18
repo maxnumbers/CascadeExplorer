@@ -242,6 +242,11 @@ export function ConversationPanel() {
         // Could prompt for which perspective
         await requestPerspective('external stakeholder');
         break;
+      case 'review_perspectives':
+        // This action triggers the Review tab in the visualization panel
+        // We emit a custom event that the VisualizationPanel can listen to
+        window.dispatchEvent(new CustomEvent('cascade:review-perspectives'));
+        break;
       case 'discuss':
         addUserTurn("I'd like to discuss these impacts further.", 'question');
         break;

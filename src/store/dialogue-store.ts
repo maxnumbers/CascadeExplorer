@@ -5,10 +5,20 @@
  * - Conversation turns with typed moves
  * - Agreement tracking (what's established vs. open)
  * - Phase management (seeding, reflecting, negotiating, etc.)
+ *
+ * NOTE: This store uses types from @/types/conversation.ts where possible
+ * to maintain a unified type system across the application.
  */
 
 import { create } from 'zustand';
+import type { ConversationMoveType } from '@/types/conversation';
 
+// Re-export the move type for consumers that import from this module
+export type MoveType = ConversationMoveType | 'welcome_message';
+
+/**
+ * Conversation phases - extended from the base schema to include 'welcome'
+ */
 export type ConversationPhase =
   | 'welcome'       // Initial state, showing welcome message
   | 'seeding'       // User providing initial assertion
@@ -19,27 +29,11 @@ export type ConversationPhase =
   | 'simulating'    // Exploring temporal dynamics
   | 'concluding';   // Synthesizing insights
 
-export type MoveType =
-  // User moves
-  | 'assertion'
-  | 'question'
-  | 'challenge'
-  | 'refinement'
-  | 'agreement'
-  | 'rejection'
-  | 'elaboration'
-  | 'perspective_request'
-  // AI moves
-  | 'reflection'
-  | 'clarification_request'
-  | 'proposal'
-  | 'explanation'
-  | 'alternative'
-  | 'conflict_surface'
-  | 'grounding_offer'
-  | 'teachback_request'
-  | 'welcome_message';
-
+/**
+ * A conversation turn in the runtime state.
+ * This is a simplified version of ConversationTurn from conversation.ts,
+ * optimized for the Zustand store and UI rendering.
+ */
 export interface ConversationTurn {
   id: string;
   timestamp: string;
@@ -72,6 +66,10 @@ export interface ConversationTurn {
   error?: string;
 }
 
+/**
+ * An item that has been agreed upon in the conversation.
+ * Maps to AgreementState.agreedConcepts/agreedRelationships in conversation.ts
+ */
 export interface AgreementItem {
   itemId: string;
   itemType: 'concept' | 'relationship' | 'perspective' | 'interpretation';
@@ -80,6 +78,10 @@ export interface AgreementItem {
   agreementType: 'explicit' | 'implicit' | 'provisional';
 }
 
+/**
+ * An open question in the conversation.
+ * Maps to AgreementState.pendingQuestions in conversation.ts
+ */
 export interface OpenQuestion {
   question: string;
   askedBy: 'user' | 'ai';

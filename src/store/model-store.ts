@@ -32,6 +32,10 @@ interface ModelState {
   // Active perspective (null = show all)
   activePerspectiveId: string | null;
 
+  // Progressive disclosure state
+  expandedHyperedges: Set<string>;  // Which concern hyperedges are expanded
+  expandedConcepts: Set<string>;     // Which composite concepts are expanded
+
   // Impact cascade (order-based)
   impacts: Array<{
     id: string;
@@ -80,6 +84,12 @@ interface ModelState {
   removeImpact: (id: string) => void;
   getImpactsByOrder: (order: 0 | 1 | 2 | 3) => ModelState['impacts'];
 
+  // Progressive disclosure
+  toggleHyperedgeExpansion: (hyperedgeId: string) => void;
+  toggleConceptExpansion: (conceptId: string) => void;
+  expandAllHyperedges: () => void;
+  collapseAllHyperedges: () => void;
+
   // Selectors
   getFilteredConcepts: () => SystemConcept[];
   getFilteredRelationships: () => ConceptRelationship[];
@@ -92,6 +102,8 @@ interface ModelState {
 export const useModelStore = create<ModelState>((set, get) => ({
   model: null,
   activePerspectiveId: null,
+  expandedHyperedges: new Set<string>(),
+  expandedConcepts: new Set<string>(),
   impacts: [],
 
   initializeModel: (seedAssertion, summary) => {
@@ -430,10 +442,48 @@ export const useModelStore = create<ModelState>((set, get) => ({
     );
   },
 
+  // Progressive disclosure
+  toggleHyperedgeExpansion: (hyperedgeId) => {
+    set((state) => {
+      const newSet = new Set(state.expandedHyperedges);
+      if (newSet.has(hyperedgeId)) {
+        newSet.delete(hyperedgeId);
+      } else {
+        newSet.add(hyperedgeId);
+      }
+      return { expandedHyperedges: newSet };
+    });
+  },
+
+  toggleConceptExpansion: (conceptId) => {
+    set((state) => {
+      const newSet = new Set(state.expandedConcepts);
+      if (newSet.has(conceptId)) {
+        newSet.delete(conceptId);
+      } else {
+        newSet.add(conceptId);
+      }
+      return { expandedConcepts: newSet };
+    });
+  },
+
+  expandAllHyperedges: () => {
+    const { model } = get();
+    if (!model) return;
+    const allIds = new Set(model.concerns.map((c) => c.id));
+    set({ expandedHyperedges: allIds });
+  },
+
+  collapseAllHyperedges: () => {
+    set({ expandedHyperedges: new Set<string>() });
+  },
+
   resetModel: () => {
     set({
       model: null,
       activePerspectiveId: null,
+      expandedHyperedges: new Set<string>(),
+      expandedConcepts: new Set<string>(),
       impacts: [],
     });
   },
@@ -444,3 +494,5 @@ export const useSystemModel = () => useModelStore((state) => state.model);
 export const useActivePerspective = () => useModelStore((state) => state.activePerspectiveId);
 export const useImpacts = () => useModelStore((state) => state.impacts);
 export const usePerspectives = () => useModelStore((state) => state.model?.perspectives ?? []);
+export const useExpandedHyperedges = () => useModelStore((state) => state.expandedHyperedges);
+export const useExpandedConcepts = () => useModelStore((state) => state.expandedConcepts);
