@@ -33,9 +33,9 @@ export const MODEL_PROVIDERS = {
     baseUrl: 'https://api.anthropic.com/v1',
     models: [
       { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', description: 'Latest balanced model' },
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', description: 'Fast and capable' },
-      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Fastest, most affordable' },
       { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', description: 'Most capable' },
+      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', description: 'Fastest, most affordable' },
+      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Fast and efficient' },
     ],
     requiresApiKey: true,
     apiKeyPlaceholder: 'sk-ant-...',
