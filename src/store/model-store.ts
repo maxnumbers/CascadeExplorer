@@ -489,10 +489,13 @@ export const useModelStore = create<ModelState>((set, get) => ({
   },
 }));
 
+// Stable empty array to prevent infinite re-render loops in selectors
+const EMPTY_PERSPECTIVES: never[] = [];
+
 // Selector hooks
 export const useSystemModel = () => useModelStore((state) => state.model);
 export const useActivePerspective = () => useModelStore((state) => state.activePerspectiveId);
 export const useImpacts = () => useModelStore((state) => state.impacts);
-export const usePerspectives = () => useModelStore((state) => state.model?.perspectives ?? []);
+export const usePerspectives = () => useModelStore((state) => state.model?.perspectives ?? EMPTY_PERSPECTIVES);
 export const useExpandedHyperedges = () => useModelStore((state) => state.expandedHyperedges);
 export const useExpandedConcepts = () => useModelStore((state) => state.expandedConcepts);

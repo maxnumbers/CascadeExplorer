@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useModelStore } from '@/store/model-store';
 import { useDialogueStore } from '@/store/dialogue-store';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -37,8 +37,10 @@ import type { SystemConcept, Perspective, ConcernHyperedge } from '@/types/persp
 // PERSPECTIVE SWITCHER
 // =============================================================================
 
+const EMPTY_PERSPECTIVES: never[] = [];
+
 function PerspectiveSwitcher() {
-  const perspectives = useModelStore((s) => s.model?.perspectives ?? []);
+  const perspectives = useModelStore((s) => s.model?.perspectives ?? EMPTY_PERSPECTIVES);
   const activePerspectiveId = useModelStore((s) => s.activePerspectiveId);
   const setActivePerspective = useModelStore((s) => s.setActivePerspective);
 

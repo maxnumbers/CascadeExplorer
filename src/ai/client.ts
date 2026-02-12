@@ -246,11 +246,25 @@ export function createAIClient(config: AIConfig) {
         };
       }
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: buildHeaders(),
-        body: JSON.stringify(body),
-      });
+      // Use server-side proxy in browser to avoid CORS issues
+      let response: Response;
+      if (typeof window !== 'undefined') {
+        response = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint,
+            headers: buildHeaders(),
+            body,
+          }),
+        });
+      } else {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: buildHeaders(),
+          body: JSON.stringify(body),
+        });
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
