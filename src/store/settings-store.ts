@@ -217,7 +217,7 @@ export const useIsConfigured = () => useSettingsStore((state) => state.isConfigu
 export const useSelectedModel = () =>
   useSettingsStore((state) => {
     const providerConfig = MODEL_PROVIDERS[state.provider];
-    const models = providerConfig.models;
+    const models = providerConfig.defaultModels;
     return models.find((m) => m.id === state.modelId) ?? models[0];
   });
 export const useProviderConfig = () =>

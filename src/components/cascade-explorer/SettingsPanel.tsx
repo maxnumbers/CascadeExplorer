@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSettingsStore } from '@/store/settings-store';
-import { MODEL_PROVIDERS, type ModelProvider } from '@/ai/client';
+import { MODEL_PROVIDERS, type ModelProvider, type ModelInfo, fetchModelsFromProvider } from '@/ai/client';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Settings, Check, Loader2, AlertCircle, Eye, EyeOff, Info, Server, Cloud } from 'lucide-react';
+import { Settings, Check, Loader2, AlertCircle, Eye, EyeOff, Info, Server, Cloud, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface SettingsPanelProps {
@@ -35,6 +35,11 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Dynamic model state
+  const [fetchedModels, setFetchedModels] = useState<ModelInfo[] | null>(null);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [modelFetchError, setModelFetchError] = useState<string | null>(null);
 
   const {
     provider,
@@ -57,6 +62,65 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
   const isCustomProvider = provider === 'custom';
   const requiresApiKey = providerConfig.requiresApiKey;
 
+  // The models to display: fetched models if available, otherwise defaults
+  const displayModels = fetchedModels ?? providerConfig.defaultModels;
+  const hasDynamicModels = fetchedModels !== null && fetchedModels.length > 0;
+
+  // Fetch models dynamically when provider or API key changes
+  const fetchModels = useCallback(async () => {
+    if (!providerConfig.supportsDynamicModels) {
+      setFetchedModels(null);
+      return;
+    }
+
+    // For providers requiring API key, only fetch if key is provided
+    if (providerConfig.requiresApiKey && !apiKey) {
+      setFetchedModels(null);
+      return;
+    }
+
+    // For custom provider, need base URL
+    if (isCustomProvider && !customBaseUrl) {
+      setFetchedModels(null);
+      return;
+    }
+
+    setIsFetchingModels(true);
+    setModelFetchError(null);
+
+    try {
+      const models = await fetchModelsFromProvider(provider, apiKey || undefined, customBaseUrl || undefined);
+      setFetchedModels(models);
+
+      // If current model isn't in the fetched list, select the first one
+      if (models.length > 0 && !models.some(m => m.id === modelId)) {
+        setModelId(models[0].id);
+      }
+    } catch {
+      setModelFetchError('Failed to fetch models');
+      setFetchedModels(null);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  }, [provider, apiKey, customBaseUrl, isCustomProvider, providerConfig, modelId, setModelId]);
+
+  // Reset fetched models when provider changes
+  useEffect(() => {
+    setFetchedModels(null);
+    setModelFetchError(null);
+  }, [provider]);
+
+  // Auto-fetch models when dialog opens and credentials are available
+  useEffect(() => {
+    if (isOpen && providerConfig.supportsDynamicModels) {
+      const hasCredentials = !providerConfig.requiresApiKey || apiKey;
+      const hasBaseUrl = !isCustomProvider || customBaseUrl;
+      if (hasCredentials && hasBaseUrl) {
+        fetchModels();
+      }
+    }
+  }, [isOpen, fetchModels, providerConfig, apiKey, isCustomProvider, customBaseUrl]);
+
   const handleValidate = async () => {
     setIsValidating(true);
     const result = await validateAndConnect();
@@ -65,7 +129,7 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
     if (result.success) {
       const modelName = isCustomProvider
         ? (customModelId || 'custom model')
-        : (providerConfig.models.find(m => m.id === modelId)?.name || modelId);
+        : (displayModels.find(m => m.id === modelId)?.name || modelId);
       toast({
         title: 'Connected!',
         description: `Successfully connected to ${providerConfig.name} with ${modelName}.`,
@@ -82,6 +146,7 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
 
   const handleClear = () => {
     clearConfiguration();
+    setFetchedModels(null);
     toast({
       title: 'Configuration Cleared',
       description: 'Your configuration has been reset.',
@@ -120,7 +185,7 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
             AI Model Settings
           </DialogTitle>
           <DialogDescription>
-            Connect to any AI provider. Supports OpenAI, Anthropic, Together AI, Groq, local models via Ollama, or LiteLLM proxy.
+            Connect to any AI provider. Supports OpenAI, Anthropic, Cerebras, Together AI, Groq, local models via Ollama, or LiteLLM proxy.
           </DialogDescription>
         </DialogHeader>
 
@@ -152,7 +217,7 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
             </Select>
 
             {/* Provider note */}
-            {'note' in providerConfig && providerConfig.note && (
+            {providerConfig.note && (
               <div className="flex items-start gap-2 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
                 <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
                 <span>{providerConfig.note}</span>
@@ -177,45 +242,6 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
                 {isCustomProvider
                   ? 'Enter any OpenAI-compatible API endpoint'
                   : 'Default: http://localhost:4000/v1'}
-              </p>
-            </div>
-          )}
-
-          {/* Model Selection */}
-          {!isCustomProvider && (
-            <div className="space-y-2">
-              <Label htmlFor="model">Model</Label>
-              <Select value={modelId} onValueChange={setModelId}>
-                <SelectTrigger id="model">
-                  <SelectValue placeholder="Select model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providerConfig.models.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      <div className="flex flex-col">
-                        <span>{model.name}</span>
-                        <span className="text-xs text-muted-foreground">{model.description}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* Custom Model ID (for custom provider) */}
-          {isCustomProvider && (
-            <div className="space-y-2">
-              <Label htmlFor="customModel">Model ID</Label>
-              <Input
-                id="customModel"
-                type="text"
-                value={customModelId}
-                onChange={(e) => setCustomModelId(e.target.value)}
-                placeholder="gpt-4o, claude-3-5-sonnet, llama-3.1-70b, etc."
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the model identifier your endpoint expects
               </p>
             </div>
           )}
@@ -260,6 +286,74 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
             </p>
           </div>
 
+          {/* Model Selection */}
+          {!isCustomProvider && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="model">Model</Label>
+                <div className="flex items-center gap-1">
+                  {hasDynamicModels && (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                      live
+                    </Badge>
+                  )}
+                  {providerConfig.supportsDynamicModels && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={fetchModels}
+                      disabled={isFetchingModels}
+                      title="Refresh model list from provider"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isFetchingModels ? 'animate-spin' : ''}`} />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              <Select value={modelId} onValueChange={setModelId}>
+                <SelectTrigger id="model">
+                  <SelectValue placeholder={isFetchingModels ? 'Loading models...' : 'Select model'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {displayModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex flex-col">
+                        <span>{model.name}</span>
+                        {model.description && (
+                          <span className="text-xs text-muted-foreground">{model.description}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {modelFetchError && (
+                <p className="text-xs text-yellow-500">
+                  Could not fetch live models. Showing defaults.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Custom Model ID (for custom provider) */}
+          {isCustomProvider && (
+            <div className="space-y-2">
+              <Label htmlFor="customModel">Model ID</Label>
+              <Input
+                id="customModel"
+                type="text"
+                value={customModelId}
+                onChange={(e) => setCustomModelId(e.target.value)}
+                placeholder="gpt-4o, claude-3-5-sonnet, llama-3.1-70b, etc."
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the model identifier your endpoint expects
+              </p>
+            </div>
+          )}
+
           {/* Connection Status */}
           {isConfigured && (
             <div className="flex items-center gap-2 p-3 rounded-lg bg-green-500/10 border border-green-500/20">
@@ -270,7 +364,7 @@ export function SettingsPanel({ trigger }: SettingsPanelProps) {
                   {providerConfig.name}: {
                     isCustomProvider
                       ? (customModelId || 'custom model')
-                      : (providerConfig.models.find(m => m.id === modelId)?.name || modelId)
+                      : (displayModels.find(m => m.id === modelId)?.name || modelId)
                   }
                 </p>
               </div>
